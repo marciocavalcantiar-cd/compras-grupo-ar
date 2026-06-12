@@ -969,11 +969,11 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
 }
 
 function gerarEspelho(semId){
-  console.log('gerarEspelho chamado, semId=',semId);
-  const sem=C.semanas.find(function(s){return s.id===semId;});if(!sem){console.log('sem nao encontrada');return;}
+  const sem=C.semanas.find(function(s){return s.id===semId;});
+  if(!sem){toast('Semana não encontrada');return;}
   const rest=C.restaurantes.find(function(r){return r.id===restAtivo;});
   const peds=C.pedidos.filter(function(p){return p.semana_id===semId;});
-  if(!peds.length){toast('Nenhum pedido nesta semana para este restaurante');return;}
+  if(!peds.length){toast('Nenhum pedido nesta semana');return;}
 
   const rows=[];
   peds.forEach(function(p){
