@@ -183,6 +183,7 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn btn-sm" onclick="refreshDados()" title="Atualizar"><i class="ti ti-refresh"></i></button>
+      <button class="btn btn-sm" onclick="gerarRelatorioProvisorio()" style="background:var(--c-accent);color:#FFFFFF;border-color:var(--c-accent)"><i class="ti ti-file-analytics"></i> Relatório</button>
       <button class="btn btn-sm" onclick="gerarEspelhoGeral()" style="background:#F0EFeb;color:#1A1A1C;border-color:#D8D7D3-border2)"><i class="ti ti-printer"></i> Espelho geral</button>
       <button class="btn-new" onclick="openNovaSemana()"><i class="ti ti-calendar-plus"></i> Nova semana</button>
     </div>
@@ -1328,6 +1329,154 @@ async function renderRelatorio(){
   });
 
   el.innerHTML=html;
+}
+
+
+
+function gerarRelatorioProvisorio(){
+  const agora=new Date();
+  const restCores2={'Arvo':'#4A6741','Terra':'#8B5E3C','Voar':'#6B2D4A'};
+  function rc(nome){return restCores2[nome]||'#3B6FE8';}
+
+  const semsAtivas=[...new Set(C.pedidos.map(p=>p.semana_id).filter(Boolean))]
+    .map(id=>C.semanas.find(s=>s.id===id)).filter(Boolean)
+    .map(s=>s.nome+(s.data_inicio&&s.data_fim?' ('+new Date(s.data_inicio+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' a '+new Date(s.data_fim+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+')':'')).join(', ');
+
+  let html='<!DOCTYPE html><html><head><meta charset="UTF-8">';
+  html+='<title>Relatório de Compras — Grupo AR</title>';
+  html+='<style>';
+  html+='*{box-sizing:border-box;margin:0;padding:0}';
+  html+='body{font-family:Arial,sans-serif;background:#fff;color:#1C1E2E;font-size:13px}';
+  html+='.page{max-width:960px;margin:0 auto;padding:32px 28px}';
+  html+='.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:18px;border-bottom:2px solid #1C1E2E}';
+  html+='.logo{width:48px;height:48px;padding:5px;border:1px solid #E8E9EF;border-radius:8px}';
+  html+='.h-info h1{font-size:19px;font-weight:700;letter-spacing:-0.02em}';
+  html+='.h-info p{font-size:12px;color:#6B7080;margin-top:3px}';
+  html+='.badge-prov{background:#FFF3E0;color:#E07C1A;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid #F0C070;display:inline-block;margin-top:5px}';
+  html+='.section{margin-bottom:28px}';
+  html+='.section-title{font-size:11px;font-weight:700;color:#6B7080;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:12px;display:flex;align-items:center;gap:8px}';
+  html+='.section-title::after{content:"";flex:1;height:1px;background:#E8E9EF}';
+  html+='.rest-section{margin-bottom:32px;page-break-inside:avoid}';
+  html+='.rest-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:8px 8px 0 0;color:#fff}';
+  html+='.rest-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #E8E9EF;border-top:none;border-radius:0 0 0 0}';
+  html+='.rst{padding:12px 14px;border-right:1px solid #E8E9EF;border-bottom:1px solid #E8E9EF}';
+  html+='.rst:last-child{border-right:none}';
+  html+='.rst-l{font-size:10px;font-weight:600;color:#9DA3B4;text-transform:uppercase;margin-bottom:4px}';
+  html+='.rst-v{font-size:15px;font-weight:700;color:#1C1E2E}';
+  html+='.rst-v.green{color:#1A8A55}.rst-v.orange{color:#E07C1A}.rst-v.gray{color:#6B7080}';
+  html+='.prog-wrap{border:1px solid #E8E9EF;border-top:none;padding:10px 14px;border-radius:0}';
+  html+='.prog{height:5px;background:#E8E9EF;border-radius:3px;overflow:hidden}';
+  html+='.prog-fill{height:100%;border-radius:3px}';
+  html+='.prog-lbl{font-size:11px;color:#6B7080;margin-top:4px;text-align:right}';
+  html+='table{width:100%;border-collapse:collapse;font-size:12px;border:1px solid #E8E9EF;border-top:none;border-radius:0 0 8px 8px;overflow:hidden}';
+  html+='th{padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#9DA3B4;text-transform:uppercase;letter-spacing:0.05em;background:#F5F6FA;border-bottom:1.5px solid #E8E9EF}';
+  html+='td{padding:8px 10px;border-bottom:1px solid #F0F1F5;vertical-align:middle}';
+  html+='tr:last-child td{border-bottom:none}';
+  html+='.td-r{text-align:right}.td-c{text-align:center}';
+  html+='.chip{font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}';
+  html+='.chip-en{background:#E8F5EE;color:#1A7A4A}';
+  html+='.chip-pr{background:#FEF0E0;color:#B86010}';
+  html+='.chip-ag{background:#F0F1F5;color:#6B7080}';
+  html+='.footer{margin-top:28px;padding-top:14px;border-top:1px solid #E8E9EF;display:flex;justify-content:space-between;font-size:10px;color:#9DA3B4}';
+  html+='@media print{body{background:#fff}.page{padding:16px}.no-print{display:none}@page{margin:10mm;size:A4}}';
+  html+='</style></head><body>';
+  html+='<div class="no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">';
+  html+='<button onclick="window.print()" style="background:#1C1E2E;color:#fff;border:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">🖨 Imprimir</button>';
+  html+='<button onclick="window.close()" style="background:#F0F1F5;color:#1C1E2E;border:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">✕ Fechar</button>';
+  html+='</div>';
+  html+='<div class="page">';
+
+  // Header
+  html+='<div class="header">';
+  html+='<div class="h-info">';
+  html+='<h1>Relatório de Compras</h1>';
+  html+='<p>Grupo AR — Cozinha de Produção</p>';
+  html+='<p style="margin-top:3px;font-size:11px;color:#6B7080">'+semsAtivas+'</p>';
+  html+='<span class="badge-prov">PROVISÓRIO</span>';
+  html+='</div>';
+  html+='<div style="text-align:right">';
+  html+='<img class="logo" src="'+logo_data+'">';
+  html+='<div style="font-size:11px;color:#9DA3B4;margin-top:6px">Gerado em<br>'+agora.toLocaleDateString('pt-BR')+' às '+agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</div>';
+  html+='</div></div>';
+
+  // Seção por restaurante
+  C.restaurantes.forEach(r=>{
+    const cor=rc(r.nome);
+    const peds=C.pedidos.filter(p=>p.restaurante_id===r.id);
+    if(!peds.length)return;
+
+    const itens=peds.flatMap(p=>C.itens.filter(i=>i.pedido_id===p.id).map(i=>({...i,pedTitulo:p.titulo,pedData:p.data})));
+    const total=itens.reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+    const entregue=itens.filter(i=>i.status==='Entregue').reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+    const previsto=itens.filter(i=>i.status==='Previsto').reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+    const aguardando=itens.filter(i=>!i.status||i.status==='Aguardando').reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+    const pct=total>0?Math.round(entregue/total*100):0;
+
+    html+='<div class="rest-section">';
+    html+='<div class="rest-header" style="background:'+cor+'">';
+    html+='<span style="font-size:15px;font-weight:700">'+r.nome+'</span>';
+    html+='<span style="font-size:18px;font-weight:700">'+fmtNum(total)+'</span>';
+    html+='</div>';
+    html+='<div class="rest-stats">';
+    html+='<div class="rst"><div class="rst-l">Entregue</div><div class="rst-v green">'+fmtNum(entregue)+'</div></div>';
+    html+='<div class="rst"><div class="rst-l">Previsto/trânsito</div><div class="rst-v orange">'+fmtNum(previsto)+'</div></div>';
+    html+='<div class="rst"><div class="rst-l">Aguardando</div><div class="rst-v gray">'+fmtNum(aguardando)+'</div></div>';
+    html+='<div class="rst"><div class="rst-l">Itens / Pedidos</div><div class="rst-v">'+itens.length+' / '+peds.length+'</div></div>';
+    html+='</div>';
+    html+='<div class="prog-wrap">';
+    html+='<div class="prog"><div class="prog-fill" style="width:'+pct+'%;background:'+cor+'"></div></div>';
+    html+='<div class="prog-lbl">'+pct+'% entregue</div>';
+    html+='</div>';
+
+    // Tabela de pedidos com itens
+    html+='<table>';
+    html+='<thead><tr>';
+    html+='<th>Fornecedor</th><th>Categoria</th><th>Item</th><th class="td-c">Med.</th>';
+    html+='<th class="td-r">Qtd.</th><th class="td-r">Valor unit.</th>';
+    html+='<th class="td-r">Total</th><th class="td-c">Status</th>';
+    html+='</tr></thead><tbody>';
+
+    // Agrupar itens por fornecedor
+    const fornecedores=[...new Set(itens.map(i=>i.fornecedor||i.pedTitulo||'—'))];
+    fornecedores.sort().forEach(forn=>{
+      const its=itens.filter(i=>(i.fornecedor||i.pedTitulo||'—')===forn);
+      // Linha de fornecedor
+      html+='<tr style="background:#F5F6FA">';
+      html+='<td colspan="8" style="font-size:11px;font-weight:700;color:#1C1E2E;text-transform:uppercase;letter-spacing:0.05em;padding:7px 10px;border-bottom:1px solid #E8E9EF">'+forn+'</td>';
+      html+='</tr>';
+      its.forEach(it=>{
+        const sub=(parseFloat(it.valor_unit)||0)*(parseFloat(it.quantidade)||0);
+        const chipCls=it.status==='Entregue'?'chip-en':it.status==='Previsto'?'chip-pr':'chip-ag';
+        const status=it.status||'Aguardando';
+        html+='<tr>';
+        html+='<td></td>';
+        html+='<td style="color:#6B7080;font-size:11px">'+(it.categoria||'—')+'</td>';
+        html+='<td style="font-weight:500">'+it.produto+'</td>';
+        html+='<td class="td-c" style="color:#6B7080">'+(it.unidade||'KG')+'</td>';
+        html+='<td class="td-r">'+(it.quantidade||'—')+'</td>';
+        html+='<td class="td-r">'+(it.valor_unit>0?fmtNum(parseFloat(it.valor_unit)):'—')+'</td>';
+        html+='<td class="td-r" style="font-weight:600">'+(sub>0?fmtNum(sub):'—')+'</td>';
+        html+='<td class="td-c"><span class="chip '+chipCls+'">'+status+'</span></td>';
+        html+='</tr>';
+      });
+    });
+
+    // Total do restaurante
+    html+='<tr style="background:#F5F6FA;font-weight:700">';
+    html+='<td colspan="6" style="text-align:right;font-size:11px;color:#6B7080;text-transform:uppercase;letter-spacing:0.05em">Total '+r.nome+'</td>';
+    html+='<td class="td-r" style="font-size:14px;color:'+cor+'">'+fmtNum(total)+'</td>';
+    html+='<td></td></tr>';
+    html+='</tbody></table></div>';
+  });
+
+  // Rodapé
+  html+='<div class="footer">';
+  html+='<span>Grupo AR — Cozinha de Produção — Plataforma de Compras</span>';
+  html+='<span>Documento provisório — '+agora.toLocaleDateString('pt-BR')+' '+agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span>';
+  html+='</div>';
+  html+='</div></body></html>';
+
+  abrirEspelhoModal(html,'Relatório Provisório de Compras');
 }
 
 
