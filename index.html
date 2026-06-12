@@ -956,16 +956,7 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
     +'</div>'
     +'</body></html>';
 
-  const blob=new Blob([html],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='espelho-'+sem.nome.replace(/[^a-zA-Z0-9]/g,'-')+'.html';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function(){URL.revokeObjectURL(url);},1000);
-  toast('Espelho baixado! Abra o arquivo para imprimir.');
+  abrirEspelhoModal(html,'Espelho — '+sem.nome);
 }
 
 function gerarEspelho(semId){
@@ -1079,18 +1070,45 @@ function gerarEspelho(semId){
     +'</div>'
     +'</body></html>';
 
-  const blob=new Blob([html],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='espelho-'+sem.nome.replace(/[^a-zA-Z0-9]/g,'-')+'.html';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function(){URL.revokeObjectURL(url);},1000);
-  toast('Espelho baixado! Abra o arquivo para imprimir.');
+  abrirEspelhoModal(html,'Espelho — '+sem.nome);
 }
 
+
+
+function abrirEspelhoModal(html, titulo){
+  let ov=document.getElementById('espelho-ov');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='espelho-ov';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column';
+    const bar=document.createElement('div');
+    bar.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#18181A;border-bottom:1px solid #333';
+    const tit=document.createElement('span');
+    tit.id='espelho-titulo';
+    tit.style.cssText='color:#EF9F27;font-weight:600;font-size:14px';
+    const btnPrint=document.createElement('button');
+    btnPrint.textContent='Imprimir';
+    btnPrint.style.cssText='background:#EF9F27;color:#18181A;border:none;border-radius:6px;padding:6px 14px;font-weight:600;cursor:pointer;font-size:13px;margin-right:8px';
+    btnPrint.onclick=function(){document.getElementById('espelho-iframe').contentWindow.print();};
+    const btnClose=document.createElement('button');
+    btnClose.textContent='Fechar';
+    btnClose.style.cssText='background:#333;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px';
+    btnClose.onclick=function(){ov.remove();};
+    const fr=document.createElement('iframe');
+    fr.id='espelho-iframe';
+    fr.style.cssText='flex:1;border:none;background:#fff;width:100%;height:100%';
+    bar.appendChild(tit);
+    const btns=document.createElement('div');
+    btns.appendChild(btnPrint);
+    btns.appendChild(btnClose);
+    bar.appendChild(btns);
+    ov.appendChild(bar);
+    ov.appendChild(fr);
+    document.body.appendChild(ov);
+  }
+  document.getElementById('espelho-titulo').textContent=titulo;
+  document.getElementById('espelho-iframe').srcdoc=html;
+}
 
 function showModal(html){document.getElementById('mbox').innerHTML=html;document.getElementById('overlay').classList.add('open')}
 function closeModal(){document.getElementById('overlay').classList.remove('open')}
