@@ -960,6 +960,7 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
 }
 
 function gerarEspelho(semId){
+  alert('gerarEspelho chamado! semId='+semId+' | peds='+C.pedidos.filter(function(p){return p.semana_id===semId;}).length);
   const sem=C.semanas.find(function(s){return s.id===semId;});
   if(!sem){toast('Semana não encontrada');return;}
   const rest=C.restaurantes.find(function(r){return r.id===restAtivo;});
