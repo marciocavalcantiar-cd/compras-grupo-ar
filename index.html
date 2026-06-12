@@ -831,20 +831,19 @@ function confirmarEspelhoGeral(){
 }
 
 function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
-  const allPeds=C.pedidos.filter(function(p){return restFiltro.includes(p.restaurante_id)&&(!semFiltro||p.semana_id===semFiltro);});
-  if(!allPeds.length){toast('Nenhum pedido encontrado');return;}
-
+  const peds=C.pedidos.filter(p=>restFiltro.includes(p.restaurante_id)&&(!semFiltro||p.semana_id===semFiltro));
+  if(!peds.length){toast('Nenhum pedido encontrado');return;}
   const rows=[];
-  allPeds.forEach(function(p){
-    const rest=C.restaurantes.find(function(r){return r.id===p.restaurante_id;});
-    const sem=C.semanas.find(function(s){return s.id===p.semana_id;});
-    C.itens.filter(function(i){return i.pedido_id===p.id&&statusFiltro.includes(i.status||'Aguardando');}).forEach(function(it){
+  peds.forEach(p=>{
+    const rest=C.restaurantes.find(r=>r.id===p.restaurante_id);
+    const sem=C.semanas.find(s=>s.id===p.semana_id);
+    C.itens.filter(i=>i.pedido_id===p.id&&statusFiltro.includes(i.status||'Aguardando')).forEach(it=>{
       rows.push({
         restNome:rest?rest.nome:'—',
         semNome:sem?sem.nome:'—',
         forn:it.fornecedor||p.titulo||'—',
         cat:it.categoria||'—',
-        item:it.produto,
+        item:it.produto||'—',
         med:it.unidade||'KG',
         valor:parseFloat(it.valor_unit)||0,
         qty:parseFloat(it.quantidade)||0,
@@ -852,229 +851,156 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
       });
     });
   });
-
   if(!rows.length){toast('Nenhum item com os filtros selecionados');return;}
-
-  rows.sort(function(a,b){return a.forn.localeCompare(b.forn)||a.restNome.localeCompare(b.restNome)||a.cat.localeCompare(b.cat)||a.item.localeCompare(b.item);});
-
-  var totalGeral=rows.reduce(function(s,r){return s+r.valor*r.qty;},0);
-  var lastForn='';
-  var rowsHtml='';
-  var n=0;
-  const statusBg={Aguardando:'#f1efe8',Previsto:'#faeeda',Entregue:'#eaf3de'};
-  const statusClr={Aguardando:'#5F5E5A',Previsto:'#854F0B',Entregue:'#3B6D11'};
-
-  rows.forEach(function(r){
+  rows.sort((a,b)=>a.forn.localeCompare(b.forn)||a.restNome.localeCompare(b.restNome)||a.cat.localeCompare(b.cat)||a.item.localeCompare(b.item));
+  const total=rows.reduce((s,r)=>s+r.valor*r.qty,0);
+  const sBg={Aguardando:'#f1efe8',Previsto:'#faeeda',Entregue:'#eaf3de'};
+  const sClr={Aguardando:'#5F5E5A',Previsto:'#854F0B',Entregue:'#3B6D11'};
+  let lastForn='',tbody='',n=0;
+  rows.forEach(r=>{
     if(r.forn!==lastForn){
       lastForn=r.forn;
-      rowsHtml+='<tr><td colspan="10" style="background:#18181A;color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:7px 14px">'+r.forn+'</td></tr>';
+      tbody+='<tr style="background:#18181A"><td colspan="10" style="color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;padding:7px 12px;letter-spacing:0.05em">'+r.forn+'</td></tr>';
     }
     const sub=r.valor*r.qty;
-    const bg=n%2===0?'#f9f9f9':'#ffffff';n++;
-    const vFmt=r.valor>0?fmtNum(r.valor):'—';
-    const sFmt=sub>0?fmtNum(sub):'—';
-    const sBg=statusBg[r.status]||'#f1efe8';
-    const sClr=statusClr[r.status]||'#5F5E5A';
-    rowsHtml+='<tr style="background:'+bg+'">'
+    const bg=n++%2?'#fff':'#f9f9f9';
+    tbody+='<tr style="background:'+bg+'">'
       +'<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:500">'+r.restNome+'</td>'
       +'<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#888">'+r.cat+'</td>'
       +'<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:13px">'+r.item+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;color:#666">'+r.med+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px">'+vFmt+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;font-size:13px;font-weight:500">'+(r.qty||'—')+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px">'+sFmt+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center"><span style="background:'+sBg+';color:'+sClr+';font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px">'+r.status+'</span></td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;width:50px"><span style="display:inline-block;width:20px;height:20px;border:1.5px solid #bbb;border-radius:4px"></span></td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center">'+r.med+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right">'+fmtNum(r.valor)+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:500">'+(r.qty||'—')+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right">'+fmtNum(sub)+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center"><span style="background:'+(sBg[r.status]||'#f1efe8')+';color:'+(sClr[r.status]||'#5F5E5A')+';font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px">'+r.status+'</span></td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;width:50px"><span style="display:inline-block;width:20px;height:20px;border:1.5px solid #bbb;border-radius:3px"></span></td>'
       +'<td style="padding:8px 10px;border-bottom:1px solid #eee;width:90px"><div style="border-bottom:1.5px solid #bbb;height:20px"></div></td>'
       +'</tr>';
   });
-
-  const semanas=[...new Set(rows.map(function(r){return r.semNome;}))].filter(function(s){return s!=='—';}).join(', ');
-  const restaurantes=[...new Set(rows.map(function(r){return r.restNome;}))].join(', ');
-  const totalFmt=fmtNum(totalGeral);
-
-  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Espelho Geral</title>'
-    +'<style>'
-    +'*{box-sizing:border-box}'
-    +'body{font-family:Arial,sans-serif;padding:24px;color:#222;max-width:1000px;margin:0 auto;background:#fff}'
-    +'.hr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}'
-    +'h1{font-size:18px;font-weight:700;margin:0;color:#18181A}'
-    +'.sub{font-size:12px;color:#888;margin-bottom:16px}'
-    +'.logo{width:52px;height:52px;padding:6px;background:#fff;border:1px solid #eee;border-radius:8px;display:flex;align-items:center;justify-content:center}'
-    +'.info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;background:#f5f5f5;padding:12px 14px;border-radius:8px}'
+  const sems=[...new Set(rows.map(r=>r.semNome))].filter(s=>s!=='—').join(', ');
+  const rests=[...new Set(rows.map(r=>r.restNome))].join(', ');
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<title>Espelho Geral</title>'
+    +'<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#222;background:#fff}'
+    +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}'
+    +'h1{font-size:18px;font-weight:700;margin:0}p{font-size:12px;color:#888;margin:4px 0 0}'
+    +'.logo{width:48px;height:48px;background:#fff;border:1px solid #eee;border-radius:8px;padding:4px;display:flex;align-items:center;justify-content:center}'
+    +'.info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:16px}'
     +'.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}'
     +'.ii span{font-size:12px;font-weight:500}'
-    +'.legenda{font-size:10px;color:#888;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap}'
-    +'table{width:100%;border-collapse:collapse}'
-    +'thead tr{background:#18181A}'
-    +'th{padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:#EF9F27;font-weight:600;letter-spacing:0.04em}'
+    +'table{width:100%;border-collapse:collapse}thead tr{background:#18181A}'
+    +'th{padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:#EF9F27;font-weight:600}'
     +'.tf td{background:#18181A;padding:9px 10px;font-weight:700;color:#EF9F27}'
     +'.tfl{text-align:right;font-size:11px;color:#FAC775;font-weight:400}'
-    +'.footer{margin-top:20px;font-size:10px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:10px;display:flex;justify-content:space-between}'
-    +'.assinatura{border-top:1.5px solid #222;width:180px;text-align:center;padding-top:4px;font-size:10px;color:#666;margin-top:32px}'
+    +'.sig{display:flex;justify-content:space-between;margin-top:40px}'
+    +'.s{border-top:1.5px solid #222;width:180px;text-align:center;padding-top:4px;font-size:11px;color:#666}'
     +'@media print{@page{margin:8mm;size:A4 landscape}body{padding:0}}'
     +'</style></head><body>'
-    +'<div class="hr">'
-    +'<div><h1>Espelho Geral de Recebimento</h1><div class="sub">Grupo AR &mdash; Cozinha de Produ&ccedil;&atilde;o &mdash; '+restaurantes+' &mdash; Status: '+statusFiltro.join(', ')+'</div></div>'
-    +'<div class="logo"><img src="' + logo_data + '" style="width:40px;height:40px;object-fit:contain"></div>'
+    +'<div class="hdr"><div><h1>Espelho Geral de Recebimento</h1><p>Grupo AR — '+rests+' — Status: '+statusFiltro.join(', ')+'</p></div>'
+    +'<div class="logo"><img src="'+logo_data+'" style="width:40px;height:40px;object-fit:contain"></div>'
     +'</div>'
     +'<div class="info">'
-    +'<div class="ii"><strong>Restaurantes</strong><span>'+restaurantes+'</span></div>'
-    +'<div class="ii"><strong>Semana(s)</strong><span>'+(semanas||'&mdash;')+'</span></div>'
+    +'<div class="ii"><strong>Restaurantes</strong><span>'+rests+'</span></div>'
+    +'<div class="ii"><strong>Semana(s)</strong><span>'+(sems||'—')+'</span></div>'
     +'<div class="ii"><strong>Total de itens</strong><span>'+rows.length+'</span></div>'
     +'<div class="ii"><strong>Gerado em</strong><span>'+new Date().toLocaleDateString('pt-BR')+'</span></div>'
     +'</div>'
-    +'<div class="legenda">'
-    +'<span>&#x25A1; Conf. (&check; / &cross;)</span>'
-    +'<span>_____ Qtd. recebida</span>'
-    +'<span>Itens agrupados por fornecedor</span>'
-    +'</div>'
-    +'<table>'
-    +'<thead><tr>'
-    +'<th>Restaurante</th><th>Categoria</th><th>Item</th>'
-    +'<th style="text-align:center">Med.</th>'
-    +'<th style="text-align:right">Valor unit.</th>'
-    +'<th style="text-align:center">Qtd. pedida</th>'
-    +'<th style="text-align:right">Total</th>'
-    +'<th>Status</th>'
-    +'<th style="width:50px;text-align:center">Conf.</th>'
-    +'<th style="width:100px;text-align:center">Qtd. recebida</th>'
-    +'</tr></thead>'
-    +'<tbody>'+rowsHtml+'</tbody>'
-    +'<tfoot><tr class="tf">'
-    +'<td colspan="6" class="tfl">Total geral</td>'
-    +'<td style="text-align:right;font-size:14px">'+totalFmt+'</td>'
-    +'<td colspan="3"></td>'
-    +'</tr></tfoot>'
+    +'<table><thead><tr>'
+    +'<th>Restaurante</th><th>Categoria</th><th>Item</th><th style="text-align:center">Med.</th>'
+    +'<th style="text-align:right">Valor unit.</th><th style="text-align:center">Qtd.</th>'
+    +'<th style="text-align:right">Total</th><th>Status</th>'
+    +'<th style="text-align:center;width:50px">Conf.</th><th style="width:90px;text-align:center">Qtd. recebida</th>'
+    +'</tr></thead><tbody>'+tbody+'</tbody>'
+    +'<tfoot><tr class="tf"><td colspan="6" class="tfl">Total geral</td>'
+    +'<td style="text-align:right;font-size:14px">'+fmtNum(total)+'</td><td colspan="3"></td></tr></tfoot>'
     +'</table>'
-    +'<div style="display:flex;justify-content:space-between;margin-top:32px">'
-    +'<div class="assinatura">Respons&aacute;vel pelo recebimento</div>'
-    +'<div class="assinatura">Conferente / Estoquista</div>'
-    +'<div class="assinatura">Aprova&ccedil;&atilde;o</div>'
-    +'</div>'
-    +'<div class="footer">'
-    +'<span>Grupo AR &mdash; Cozinha de Produ&ccedil;&atilde;o</span>'
-    +'<span>Gerado em '+new Date().toLocaleDateString('pt-BR')+' &agrave;s '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span>'
-    +'</div>'
+    +'<div class="sig"><div class="s">Responsável pelo recebimento</div><div class="s">Conferente / Estoquista</div><div class="s">Aprovação</div></div>'
     +'</body></html>';
-
-  abrirEspelhoModal(html,'Espelho — '+sem.nome);
+  abrirEspelhoModal(html,'Espelho Geral de Recebimento');
 }
 
-function gerarEspelho(semId){
-  alert('gerarEspelho chamado! semId='+semId+' | peds='+C.pedidos.filter(function(p){return p.semana_id===semId;}).length);
-  const sem=C.semanas.find(function(s){return s.id===semId;});
-  if(!sem){toast('Semana não encontrada');return;}
-  const rest=C.restaurantes.find(function(r){return r.id===restAtivo;});
-  const peds=C.pedidos.filter(function(p){return p.semana_id===semId;});
-  if(!peds.length){toast('Nenhum pedido nesta semana');return;}
 
+function gerarEspelho(semId){
+  const sem=C.semanas.find(s=>s.id===semId);
+  if(!sem){toast('Semana não encontrada');return;}
+  const peds=C.pedidos.filter(p=>p.semana_id===semId);
+  if(!peds.length){toast('Nenhum pedido nesta semana');return;}
   const rows=[];
-  peds.forEach(function(p){
-    C.itens.filter(function(i){return i.pedido_id===p.id;}).forEach(function(it){
+  peds.forEach(p=>{
+    const rest=C.restaurantes.find(r=>r.id===p.restaurante_id);
+    C.itens.filter(i=>i.pedido_id===p.id).forEach(it=>{
       rows.push({
+        restNome:rest?rest.nome:'—',
         forn:it.fornecedor||p.titulo||'—',
         cat:it.categoria||'—',
-        item:it.produto,
+        item:it.produto||'—',
         med:it.unidade||'KG',
         valor:parseFloat(it.valor_unit)||0,
         qty:parseFloat(it.quantidade)||0
       });
     });
   });
-
   if(!rows.length){toast('Nenhum item nesta semana');return;}
-
-  rows.sort(function(a,b){return a.forn.localeCompare(b.forn)||a.cat.localeCompare(b.cat)||a.item.localeCompare(b.item);});
-
-  var totalGeral=rows.reduce(function(s,r){return s+r.valor*r.qty;},0);
-  var lastForn='';
-  var rowsHtml='';
-  var n=0;
-
-  rows.forEach(function(r){
+  rows.sort((a,b)=>a.forn.localeCompare(b.forn)||a.cat.localeCompare(b.cat)||a.item.localeCompare(b.item));
+  const total=rows.reduce((s,r)=>s+r.valor*r.qty,0);
+  let lastForn='',tbody='',n=0;
+  rows.forEach(r=>{
     if(r.forn!==lastForn){
       lastForn=r.forn;
-      rowsHtml+='<tr><td colspan="7" style="background:#18181A;color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:7px 14px">'+r.forn+'</td></tr>';
+      tbody+='<tr style="background:#18181A"><td colspan="8" style="color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;padding:7px 12px;letter-spacing:0.05em">'+r.forn+'</td></tr>';
     }
     const sub=r.valor*r.qty;
-    const bg=n%2===0?'#f9f9f9':'#ffffff';n++;
-    const vFmt=r.valor>0?fmtNum(r.valor):'—';
-    const sFmt=sub>0?fmtNum(sub):'—';
-    rowsHtml+='<tr style="background:'+bg+'">'
-      +'<td style="padding:9px 14px;border-bottom:1px solid #eee;font-size:11px;color:#888">'+r.cat+'</td>'
-      +'<td style="padding:9px 14px;border-bottom:1px solid #eee;font-size:13px">'+r.item+'</td>'
-      +'<td style="padding:9px 14px;border-bottom:1px solid #eee;text-align:center;font-size:12px">'+r.med+'</td>'
-      +'<td style="padding:9px 14px;border-bottom:1px solid #eee;text-align:right;font-size:12px">'+vFmt+'</td>'
-      +'<td style="padding:9px 14px;border-bottom:1px solid #eee;text-align:center;font-size:13px;font-weight:500">'+(r.qty||'—')+'</td>'
-      +'<td style="padding:9px 14px;border-bottom:1px solid #eee;text-align:center;width:60px"><span style="display:inline-block;width:22px;height:22px;border:1.5px solid #bbb;border-radius:4px"></span></td>'
-      +'<td style="padding:9px 14px;border-bottom:1px solid #eee;width:100px"><div style="border-bottom:1.5px solid #bbb;height:22px"></div></td>'
+    const bg=n++%2?'#fff':'#f9f9f9';
+    tbody+='<tr style="background:'+bg+'">'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:11px;color:#888">'+r.restNome+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:11px;color:#888">'+r.cat+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px">'+r.item+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">'+r.med+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">'+fmtNum(r.valor)+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;font-weight:500">'+(r.qty||'—')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;width:50px"><span style="display:inline-block;width:20px;height:20px;border:1.5px solid #bbb;border-radius:3px"></span></td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;width:90px"><div style="border-bottom:1.5px solid #bbb;height:20px"></div></td>'
       +'</tr>';
   });
-
-  const totalFmt=fmtNum(totalGeral);
-
-  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Espelho &mdash; '+sem.nome+'</title>'
-    +'<style>'
-    +'*{box-sizing:border-box}'
-    +'body{font-family:Arial,sans-serif;padding:28px;color:#222;max-width:820px;margin:0 auto;background:#fff}'
-    +'.hr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}'
-    +'h1{font-size:19px;font-weight:700;margin:0;color:#18181A}'
-    +'.sub{font-size:13px;color:#888;margin-bottom:20px}'
-    +'.logo{width:52px;height:52px;padding:6px;background:#fff;border:1px solid #eee;border-radius:8px;display:flex;align-items:center;justify-content:center}'
-    +'.info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;background:#f5f5f5;padding:12px 14px;border-radius:8px}'
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<title>Espelho — '+sem.nome+'</title>'
+    +'<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#222;background:#fff}'
+    +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}'
+    +'h1{font-size:18px;font-weight:700;margin:0}p{font-size:12px;color:#888;margin:4px 0 0}'
+    +'.logo{width:48px;height:48px;background:#fff;border:1px solid #eee;border-radius:8px;padding:4px;display:flex;align-items:center;justify-content:center}'
+    +'.info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:16px}'
     +'.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}'
     +'.ii span{font-size:12px;font-weight:500}'
-    +'.legenda{font-size:11px;color:#888;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap}'
-    +'table{width:100%;border-collapse:collapse}'
-    +'thead tr{background:#18181A}'
-    +'th{padding:9px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#EF9F27;font-weight:600}'
-    +'.tf td{background:#18181A;padding:10px 14px;font-weight:700;color:#EF9F27}'
-    +'.tfl{text-align:right;font-size:12px;color:#FAC775;font-weight:400}'
-    +'.footer{margin-top:24px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between}'
-    +'.assinatura{border-top:1.5px solid #222;width:200px;text-align:center;padding-top:4px;font-size:11px;color:#666;margin-top:36px}'
-    +'@media print{@page{margin:10mm;size:A4 landscape}body{padding:0}}'
+    +'table{width:100%;border-collapse:collapse}thead tr{background:#18181A}'
+    +'th{padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#EF9F27;font-weight:600}'
+    +'.tf td{background:#18181A;padding:9px 12px;font-weight:700;color:#EF9F27}'
+    +'.tfl{text-align:right;font-size:11px;color:#FAC775;font-weight:400}'
+    +'.sig{display:flex;justify-content:space-between;margin-top:40px}'
+    +'.s{border-top:1.5px solid #222;width:200px;text-align:center;padding-top:4px;font-size:11px;color:#666}'
+    +'@media print{@page{margin:8mm;size:A4 landscape}body{padding:0}}'
     +'</style></head><body>'
-    +'<div class="hr">'
-    +'<div><h1>Espelho de Recebimento</h1><div class="sub">Grupo AR &mdash; '+(rest?rest.nome:'')+'&mdash; '+sem.nome+'</div></div>'
-    +'<div class="logo"><img src="' + logo_data + '" style="width:40px;height:40px;object-fit:contain"></div>'
+    +'<div class="hdr"><div><h1>Espelho de Recebimento</h1><p>Grupo AR — '+sem.nome+'</p></div>'
+    +'<div class="logo"><img src="'+logo_data+'" style="width:40px;height:40px;object-fit:contain"></div>'
     +'</div>'
     +'<div class="info">'
     +'<div class="ii"><strong>Semana</strong><span>'+sem.nome+'</span></div>'
-    +'<div class="ii"><strong>Restaurante</strong><span>'+(rest?rest.nome:'&mdash;')+'</span></div>'
     +'<div class="ii"><strong>Total de itens</strong><span>'+rows.length+'</span></div>'
     +'<div class="ii"><strong>Gerado em</strong><span>'+new Date().toLocaleDateString('pt-BR')+'</span></div>'
+    +'<div class="ii"><strong>Total</strong><span>'+fmtNum(total)+'</span></div>'
     +'</div>'
-    +'<div class="legenda">'
-    +'<span>&#x25A1; Conf. (&check; / &cross;)</span>'
-    +'<span>_____ Qtd. recebida</span>'
-    +'<span>Itens agrupados por fornecedor</span>'
-    +'</div>'
-    +'<table>'
-    +'<thead><tr>'
-    +'<th>Categoria</th><th>Item</th><th style="text-align:center">Med.</th>'
-    +'<th style="text-align:right">Valor unit.</th>'
-    +'<th style="text-align:center">Qtd. pedida</th>'
-    +'<th style="width:60px;text-align:center">Conf.</th>'
-    +'<th style="width:110px;text-align:center">Qtd. recebida</th>'
-    +'</tr></thead>'
-    +'<tbody>'+rowsHtml+'</tbody>'
-    +'<tfoot><tr class="tf"><td colspan="4" class="tfl">Total do pedido</td>'
-    +'<td style="text-align:center;font-size:15px">'+totalFmt+'</td>'
-    +'<td colspan="2"></td></tr></tfoot>'
+    +'<table><thead><tr>'
+    +'<th>Restaurante</th><th>Categoria</th><th>Item</th><th style="text-align:center">Med.</th>'
+    +'<th style="text-align:right">Valor unit.</th><th style="text-align:center">Qtd.</th>'
+    +'<th style="text-align:center;width:50px">Conf.</th><th style="width:90px;text-align:center">Qtd. recebida</th>'
+    +'</tr></thead><tbody>'+tbody+'</tbody>'
+    +'<tfoot><tr class="tf"><td colspan="5" class="tfl">Total geral</td>'
+    +'<td style="text-align:center;font-size:14px">'+fmtNum(total)+'</td><td colspan="2"></td></tr></tfoot>'
     +'</table>'
-    +'<div style="display:flex;justify-content:space-between;margin-top:36px">'
-    +'<div class="assinatura">Respons&aacute;vel pelo recebimento</div>'
-    +'<div class="assinatura">Conferente / Estoquista</div>'
-    +'</div>'
-    +'<div class="footer">'
-    +'<span>Grupo AR &mdash; Cozinha de Produ&ccedil;&atilde;o</span>'
-    +'<span>Gerado em '+new Date().toLocaleDateString('pt-BR')+'</span>'
-    +'</div>'
+    +'<div class="sig"><div class="s">Responsável pelo recebimento</div><div class="s">Conferente / Estoquista</div></div>'
     +'</body></html>';
-
   abrirEspelhoModal(html,'Espelho — '+sem.nome);
 }
+
 
 
 
