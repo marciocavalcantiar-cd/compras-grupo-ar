@@ -397,8 +397,8 @@ function renderTabelaItens(peds,showToolbar){
     const sbadge=`<span class="ibadge ${SC[r.status]||'ib-ag'}" onclick="cycleItem('${r.itemId}','${r.pedId}')" title="Clique para mudar">${r.status}</span>`;
     rowsHtml+=`<tr>
       <td class="cat">${r.cat}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.item}</td>
-      <td style="color:var(--ar-dim)">${r.med}</td>
+      <td style="max-width:220px"><input type="text" value="${r.item}" onchange="updItemNome('${r.itemId}',this.value)" style="width:100%;padding:3px 4px;font-size:13px;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--c-text);font-family:inherit" onfocus="this.style.borderColor='var(--c-accent)'" onblur="this.style.borderColor='transparent'" title="Clique para editar o nome"></td>
+      <td><input type="text" value="${r.med}" onchange="updItemMed('${r.itemId}',this.value)" style="width:52px;padding:3px 4px;font-size:12px;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--c-dim);font-family:inherit;text-align:center" onfocus="this.style.borderColor='var(--c-accent)'" onblur="this.style.borderColor='transparent'" title="Clique para editar a medida"></td>
       <td class="r"><input type="number" min="0" step="0.01" value="${r.valor}" onchange="updItemValor('${r.itemId}','${r.pedId}',this.value)" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--ar-border2);color:var(--ar-white);font-family:inherit" onfocus="this.style.borderColor='var(--ar-accent)'" onblur="this.style.borderColor='var(--ar-border2)'"></td>
       <td class="r"><input type="number" min="0" step="0.5" value="${r.qtd||''}" onchange="updItemQtd('${r.itemId}','${r.pedId}',this.value)" style="width:60px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--ar-border2);color:var(--ar-white);font-family:inherit" onfocus="this.style.borderColor='var(--ar-accent)'" onblur="this.style.borderColor='var(--ar-border2)'"></td>
       <td class="forn" style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${r.forn}</td>
@@ -479,6 +479,21 @@ async function delItem(itemId, pedId){
   await recalcTotal(pedId);
   toast('Item removido');
   renderPedidos();
+}
+
+
+async function updItemNome(itemId, val){
+  const v=val.trim();
+  if(!v)return;
+  await supa.from('pedido_itens').update({produto:v}).eq('id',itemId);
+  C.itens=C.itens.map(i=>i.id===itemId?{...i,produto:v}:i);
+}
+
+async function updItemMed(itemId, val){
+  const v=val.trim().toUpperCase();
+  if(!v)return;
+  await supa.from('pedido_itens').update({unidade:v}).eq('id',itemId);
+  C.itens=C.itens.map(i=>i.id===itemId?{...i,unidade:v}:i);
 }
 
 async function updItemValor(itemId,pedId,val){
