@@ -1556,12 +1556,46 @@ async function renderRelatorio(){
 
 
 
+
 function gerarRelatorioProvisorio(){
+  const fmtD2=d=>{if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;};
+  const semsOpts=C.semanas.map(s=>{
+    const datas=s.data_inicio&&s.data_fim?' ('+fmtD2(s.data_inicio)+' a '+fmtD2(s.data_fim)+')':'';
+    return '<option value="'+s.id+'">'+s.nome+datas+'</option>';
+  }).join('');
+
+  showModal(
+    '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:4px;display:flex;align-items:center;gap:8px">'
+    +'<i class="ti ti-file-analytics" style="color:var(--c-accent);font-size:18px"></i> Relatório de Compras'
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:16px">Escolha a semana para gerar o relatório provisório</div>'
+    +'<div class="field" style="margin-bottom:18px">'
+    +'<label>Semana</label>'
+    +'<select id="rp-semana" style="width:100%">'
+    +'<option value="">— Todas as semanas ativas —</option>'
+    +semsOpts
+    +'</select>'
+    +'</div>'
+    +'<div class="g8" style="justify-content:flex-end">'
+    +'<button class="btn" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-acc" onclick="confirmarRelatorioProvisorio()"><i class="ti ti-file-analytics"></i> Gerar relatório</button>'
+    +'</div>'
+  );
+}
+
+function confirmarRelatorioProvisorio(){
+  const semFiltro=document.getElementById('rp-semana')?.value||'';
+  closeModal();
+  _gerarRelatorioProvisorio(semFiltro);
+}
+
+function _gerarRelatorioProvisorio(semFiltro){
   const agora=new Date();
   const restCores2={'Arvo':'#4A6741','Terra':'#8B5E3C','Voar':'#6B2D4A'};
   function rc(nome){return restCores2[nome]||'#3B6FE8';}
 
-  const semsAtivas=[...new Set(C.pedidos.map(p=>p.semana_id).filter(Boolean))]
+  const pedsConsiderados=semFiltro?C.pedidos.filter(p=>p.semana_id===semFiltro):C.pedidos;
+  const semsAtivas=[...new Set(pedsConsiderados.map(p=>p.semana_id).filter(Boolean))]
     .map(id=>C.semanas.find(s=>s.id===id)).filter(Boolean)
     .map(s=>s.nome+(s.data_inicio&&s.data_fim?' ('+new Date(s.data_inicio+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' a '+new Date(s.data_fim+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+')':'')).join(', ');
 
@@ -1625,7 +1659,7 @@ function gerarRelatorioProvisorio(){
   // Seção por restaurante
   C.restaurantes.forEach(r=>{
     const cor=rc(r.nome);
-    const peds=C.pedidos.filter(p=>p.restaurante_id===r.id);
+    const peds=C.pedidos.filter(p=>p.restaurante_id===r.id&&(!semFiltro||p.semana_id===semFiltro));
     if(!peds.length)return;
 
     const itens=peds.flatMap(p=>C.itens.filter(i=>i.pedido_id===p.id).map(i=>({...i,pedTitulo:p.titulo,pedData:p.data})));
