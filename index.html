@@ -1284,22 +1284,28 @@ function renderPrecosView(){
   const el=document.getElementById('area-precos');
   const data=precosCache;
 
-  // Toolbar com filtro de visualização e busca
-  let toolbar='<div class="card" style="margin-bottom:14px">';
+  let toolbar='<div class="card" style="margin-bottom:12px;padding:14px 16px">';
   toolbar+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">';
   toolbar+='<div style="display:flex;gap:6px">';
   toolbar+='<button class="sort-btn'+(precosViewMode==='produto'?' active':'')+'" onclick="setPrecosView(\'produto\')"><i class="ti ti-package"></i> Por produto</button>';
   toolbar+='<button class="sort-btn'+(precosViewMode==='fornecedor'?' active':'')+'" onclick="setPrecosView(\'fornecedor\')"><i class="ti ti-truck"></i> Por fornecedor</button>';
   toolbar+='</div>';
-  toolbar+='<input type="text" id="precos-search" placeholder="Buscar..." oninput="renderPrecosView()" style="max-width:240px">';
+  toolbar+='<input type="text" id="precos-search" placeholder="Buscar..." oninput="renderPrecosView()" style="max-width:220px;padding:6px 10px;font-size:12px">';
   toolbar+='</div></div>';
 
   const q=(document.getElementById('precos-search')?.value||'').toLowerCase();
-
   let html=toolbar;
 
+  function variacaoHtml(atual,anterior){
+    if(!anterior)return '<span style="color:var(--c-dim2);font-size:11px">—</span>';
+    const diff=atual.valor_unit-anterior.valor_unit;
+    const pct=anterior.valor_unit>0?Math.round(diff/anterior.valor_unit*100):0;
+    const cor=diff>0?'#D63B3B':diff<0?'#1A8A55':'#9DA3B4';
+    const seta=diff>0?'▲':diff<0?'▼':'•';
+    return '<span style="color:'+cor+';font-weight:600;font-size:11px">'+seta+' '+Math.abs(pct)+'%</span>';
+  }
+
   if(precosViewMode==='produto'){
-    // Agrupar por produto > fornecedor
     const porProduto={};
     data.forEach(h=>{
       if(q&&!h.produto_nome.toLowerCase().includes(q))return;
@@ -1311,39 +1317,45 @@ function renderPrecosView(){
     const produtosOrdenados=Object.keys(porProduto).sort();
     if(!produtosOrdenados.length){
       html+='<div class="empty">Nenhum resultado encontrado.</div>';
-    }
-    produtosOrdenados.forEach(prod=>{
-      const info=porProduto[prod];
-      html+='<div class="card" style="margin-bottom:12px">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
-      html+='<div style="font-size:15px;font-weight:700;color:var(--c-text)">'+prod+'</div>';
-      html+='<div style="font-size:11px;color:var(--c-dim);background:var(--c-bg);padding:3px 10px;border-radius:999px">'+(info.categoria||'—')+'</div>';
-      html+='</div>';
+    } else {
+      html+='<div class="card" style="padding:0;overflow:hidden">';
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12.5px">';
+      html+='<thead><tr style="background:var(--c-bg)">';
+      html+='<th style="padding:7px 12px">Produto</th>';
+      html+='<th style="padding:7px 12px">Categoria</th>';
+      html+='<th style="padding:7px 12px">Fornecedor</th>';
+      html+='<th class="td-r" style="padding:7px 12px;text-align:right">Preço atual</th>';
+      html+='<th class="td-c" style="padding:7px 12px;text-align:center;width:60px">Var.</th>';
+      html+='<th style="padding:7px 12px;text-align:center;width:80px">Data</th>';
+      html+='<th style="padding:7px 12px;text-align:center;width:50px">Reg.</th>';
+      html+='</tr></thead><tbody>';
 
-      const fornsOrdenados=Object.keys(info.fornecedores).sort();
-      fornsOrdenados.forEach(forn=>{
-        const hist=info.fornecedores[forn].sort((a,b)=>new Date(b.registrado_em)-new Date(a.registrado_em));
-        const atual=hist[0];
-        const anterior=hist[1];
-        let variacao='';
-        if(anterior){
-          const diff=atual.valor_unit-anterior.valor_unit;
-          const pct=anterior.valor_unit>0?Math.round(diff/anterior.valor_unit*100):0;
-          const cor=diff>0?'#D63B3B':diff<0?'#1A8A55':'#9DA3B4';
-          const seta=diff>0?'↑':diff<0?'↓':'→';
-          variacao='<span style="color:'+cor+';font-weight:600;font-size:12px;margin-left:8px">'+seta+' '+Math.abs(pct)+'%</span>';
-        }
-        html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--c-border)">';
-        html+='<div><span style="font-weight:500;color:var(--c-accent)">'+forn+'</span>';
-        html+='<span style="font-size:11px;color:var(--c-dim);margin-left:8px">'+hist.length+' registro(s)</span></div>';
-        html+='<div style="text-align:right"><span style="font-weight:700;font-size:15px">'+fmtNum(atual.valor_unit)+'</span>'+variacao;
-        html+='<div style="font-size:10px;color:var(--c-dim2)">'+new Date(atual.registrado_em).toLocaleDateString('pt-BR')+'</div></div>';
-        html+='</div>';
+      let rowN=0;
+      produtosOrdenados.forEach(prod=>{
+        const info=porProduto[prod];
+        const fornsOrdenados=Object.keys(info.fornecedores).sort();
+        const totalLinhasProduto=fornsOrdenados.length;
+        fornsOrdenados.forEach((forn,fi)=>{
+          const hist=info.fornecedores[forn].sort((a,b)=>new Date(b.registrado_em)-new Date(a.registrado_em));
+          const atual=hist[0];
+          const anterior=hist[1];
+          const bg=rowN%2?'#fff':'var(--c-bg)';rowN++;
+          html+='<tr style="background:'+bg+'">';
+          if(fi===0){
+            html+='<td rowspan="'+totalLinhasProduto+'" style="padding:7px 12px;font-weight:600;border-bottom:1px solid var(--c-border);vertical-align:middle">'+prod+'</td>';
+            html+='<td rowspan="'+totalLinhasProduto+'" style="padding:7px 12px;color:var(--c-dim);font-size:11px;border-bottom:1px solid var(--c-border);vertical-align:middle">'+(info.categoria||'—')+'</td>';
+          }
+          html+='<td style="padding:7px 12px;color:var(--c-accent);font-weight:500;border-bottom:1px solid var(--c-border)">'+forn+'</td>';
+          html+='<td class="td-r" style="padding:7px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--c-border)">'+fmtNum(atual.valor_unit)+'</td>';
+          html+='<td class="td-c" style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--c-border)">'+variacaoHtml(atual,anterior)+'</td>';
+          html+='<td style="padding:7px 12px;text-align:center;font-size:11px;color:var(--c-dim);border-bottom:1px solid var(--c-border)">'+new Date(atual.registrado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})+'</td>';
+          html+='<td style="padding:7px 12px;text-align:center;font-size:11px;color:var(--c-dim2);border-bottom:1px solid var(--c-border)">'+hist.length+'</td>';
+          html+='</tr>';
+        });
       });
-      html+='</div>';
-    });
+      html+='</tbody></table></div>';
+    }
   } else {
-    // Agrupar por fornecedor > produto
     const porForn={};
     data.forEach(h=>{
       if(q&&!h.fornecedor.toLowerCase().includes(q)&&!h.produto_nome.toLowerCase().includes(q))return;
@@ -1355,37 +1367,42 @@ function renderPrecosView(){
     const fornsOrdenados=Object.keys(porForn).sort();
     if(!fornsOrdenados.length){
       html+='<div class="empty">Nenhum resultado encontrado.</div>';
-    }
-    fornsOrdenados.forEach(forn=>{
-      const produtos=porForn[forn];
-      const qtdProdutos=Object.keys(produtos).length;
-      html+='<div class="card" style="margin-bottom:12px">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
-      html+='<div style="font-size:15px;font-weight:700;color:var(--c-accent)">'+forn+'</div>';
-      html+='<div style="font-size:11px;color:var(--c-dim)">'+qtdProdutos+' produto(s)</div>';
-      html+='</div>';
+    } else {
+      html+='<div class="card" style="padding:0;overflow:hidden">';
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12.5px">';
+      html+='<thead><tr style="background:var(--c-bg)">';
+      html+='<th style="padding:7px 12px">Fornecedor</th>';
+      html+='<th style="padding:7px 12px">Produto</th>';
+      html+='<th class="td-r" style="padding:7px 12px;text-align:right">Preço atual</th>';
+      html+='<th class="td-c" style="padding:7px 12px;text-align:center;width:60px">Var.</th>';
+      html+='<th style="padding:7px 12px;text-align:center;width:80px">Data</th>';
+      html+='<th style="padding:7px 12px;text-align:center;width:50px">Reg.</th>';
+      html+='</tr></thead><tbody>';
 
-      Object.keys(produtos).sort().forEach(prod=>{
-        const hist=produtos[prod].sort((a,b)=>new Date(b.registrado_em)-new Date(a.registrado_em));
-        const atual=hist[0];
-        const anterior=hist[1];
-        let variacao='';
-        if(anterior){
-          const diff=atual.valor_unit-anterior.valor_unit;
-          const pct=anterior.valor_unit>0?Math.round(diff/anterior.valor_unit*100):0;
-          const cor=diff>0?'#D63B3B':diff<0?'#1A8A55':'#9DA3B4';
-          const seta=diff>0?'↑':diff<0?'↓':'→';
-          variacao='<span style="color:'+cor+';font-weight:600;font-size:12px;margin-left:8px">'+seta+' '+Math.abs(pct)+'%</span>';
-        }
-        html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--c-border)">';
-        html+='<div><span style="font-weight:500">'+prod+'</span>';
-        html+='<span style="font-size:11px;color:var(--c-dim);margin-left:8px">'+hist.length+' registro(s)</span></div>';
-        html+='<div style="text-align:right"><span style="font-weight:700;font-size:15px">'+fmtNum(atual.valor_unit)+'</span>'+variacao;
-        html+='<div style="font-size:10px;color:var(--c-dim2)">'+new Date(atual.registrado_em).toLocaleDateString('pt-BR')+'</div></div>';
-        html+='</div>';
+      let rowN=0;
+      fornsOrdenados.forEach(forn=>{
+        const produtos=porForn[forn];
+        const produtosOrd=Object.keys(produtos).sort();
+        const totalLinhasForn=produtosOrd.length;
+        produtosOrd.forEach((prod,pi)=>{
+          const hist=produtos[prod].sort((a,b)=>new Date(b.registrado_em)-new Date(a.registrado_em));
+          const atual=hist[0];
+          const anterior=hist[1];
+          const bg=rowN%2?'#fff':'var(--c-bg)';rowN++;
+          html+='<tr style="background:'+bg+'">';
+          if(pi===0){
+            html+='<td rowspan="'+totalLinhasForn+'" style="padding:7px 12px;font-weight:600;color:var(--c-accent);border-bottom:1px solid var(--c-border);vertical-align:middle">'+forn+'</td>';
+          }
+          html+='<td style="padding:7px 12px;font-weight:500;border-bottom:1px solid var(--c-border)">'+prod+'</td>';
+          html+='<td class="td-r" style="padding:7px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--c-border)">'+fmtNum(atual.valor_unit)+'</td>';
+          html+='<td class="td-c" style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--c-border)">'+variacaoHtml(atual,anterior)+'</td>';
+          html+='<td style="padding:7px 12px;text-align:center;font-size:11px;color:var(--c-dim);border-bottom:1px solid var(--c-border)">'+new Date(atual.registrado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})+'</td>';
+          html+='<td style="padding:7px 12px;text-align:center;font-size:11px;color:var(--c-dim2);border-bottom:1px solid var(--c-border)">'+hist.length+'</td>';
+          html+='</tr>';
+        });
       });
-      html+='</div>';
-    });
+      html+='</tbody></table></div>';
+    }
   }
 
   el.innerHTML=html;
