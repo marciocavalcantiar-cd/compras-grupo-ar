@@ -193,6 +193,7 @@
     <button class="tab active" onclick="showPage('pedidos',this)">Pedidos</button>
     <button class="tab" onclick="showPage('dashboard',this)">Dashboard</button>
     <button class="tab" onclick="showPage('relatorio',this);renderRelatorio()"><i class="ti ti-calendar-stats"></i> Relatório</button>
+    <button class="tab" onclick="showPage('precos',this);renderHistoricoPrecos()"><i class="ti ti-chart-line"></i> Histórico de Preços</button>
   </div>
 
   <!-- PEDIDOS -->
@@ -207,6 +208,9 @@
   </div>
   <div id="page-relatorio" class="page">
     <div id="area-relatorio"></div>
+  </div>
+  <div id="page-precos" class="page">
+    <div id="area-precos"></div>
   </div>
 </div>
 
@@ -500,8 +504,19 @@ async function updItemValor(itemId,pedId,val){
   const v=parseFloat(val)||0;
   await supa.from('pedido_itens').update({valor_unit:v}).eq('id',itemId);
   C.itens=C.itens.map(i=>i.id===itemId?{...i,valor_unit:v}:i);
-  // Recalcular total do pedido
   await recalcTotal(pedId);
+  // Registrar mudança no histórico de preços
+  if(v>0){
+    const it=C.itens.find(i=>i.id===itemId);
+    const ped=C.pedidos.find(p=>p.id===pedId);
+    const restNome=C.restaurantes.find(r=>r.id===ped?.restaurante_id)?.nome||'';
+    if(it){
+      await supa.from('historico_precos').insert({
+        produto_nome:it.produto,categoria:it.categoria,fornecedor:it.fornecedor||ped?.titulo||'—',
+        valor_unit:v,unidade:it.unidade,restaurante_nome:restNome,pedido_item_id:itemId
+      });
+    }
+  }
 }
 
 async function updItemQtd(itemId,pedId,val){
@@ -733,12 +748,22 @@ async function criarPedido(){
     restaurante_id:restAtivo,semana_id:pedSemId,titulo,data,status:'Aguardando',total
   }).select().single();
   if(error){toast('Erro ao criar pedido');return}
-  await supa.from('pedido_itens').insert(ids.map(id=>{
+  const {data:itensInseridos}=await supa.from('pedido_itens').insert(ids.map(id=>{
     const p=ncSel[id];
     return{pedido_id:ped.id,produto:p.nome,categoria:p.categoria,unidade:p.unidade,
       quantidade:parseFloat(p.qty)||null,valor_unit:parseFloat(p.valor)||null,
       fornecedor:titulo,status:'Aguardando'};
-  }));
+  })).select();
+  // Registrar no histórico de preços (somente itens com valor preenchido)
+  if(itensInseridos&&itensInseridos.length){
+    const restNome=C.restaurantes.find(r=>r.id===restAtivo)?.nome||'';
+    const histRows=itensInseridos.filter(it=>it.valor_unit>0).map(it=>({
+      produto_nome:it.produto,categoria:it.categoria,fornecedor:it.fornecedor,
+      valor_unit:it.valor_unit,unidade:it.unidade,restaurante_nome:restNome,
+      pedido_item_id:it.id
+    }));
+    if(histRows.length)await supa.from('historico_precos').insert(histRows);
+  }
   toast('Pedido criado!');closeModal();await reloadAll();renderPedidos();
 }
 async function delPedido(id){
@@ -1231,6 +1256,139 @@ function renderCategoriasHtml(mes, ano){
         +'<div style="height:100%;width:'+pct+'%;background:'+cor+';border-radius:2px"></div>'
         +'</div></div>';
     }).join('')+'</div>';
+}
+
+let precosViewMode='produto';
+let precosCache=[];
+
+async function renderHistoricoPrecos(){
+  const el=document.getElementById('area-precos');
+  if(!el)return;
+  el.innerHTML='<div class="empty"><i class="ti ti-loader"></i>Carregando histórico...</div>';
+
+  const {data,error}=await supa.from('historico_precos').select('*').order('registrado_em',{ascending:false});
+  if(error||!data||!data.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-chart-line"></i>Nenhum histórico de preços ainda.<br>Os preços ficam registrados automaticamente ao criar pedidos ou editar valores.</div>';
+    return;
+  }
+  precosCache=data;
+  renderPrecosView();
+}
+
+function setPrecosView(mode){
+  precosViewMode=mode;
+  renderPrecosView();
+}
+
+function renderPrecosView(){
+  const el=document.getElementById('area-precos');
+  const data=precosCache;
+
+  // Toolbar com filtro de visualização e busca
+  let toolbar='<div class="card" style="margin-bottom:14px">';
+  toolbar+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">';
+  toolbar+='<div style="display:flex;gap:6px">';
+  toolbar+='<button class="sort-btn'+(precosViewMode==='produto'?' active':'')+'" onclick="setPrecosView(\'produto\')"><i class="ti ti-package"></i> Por produto</button>';
+  toolbar+='<button class="sort-btn'+(precosViewMode==='fornecedor'?' active':'')+'" onclick="setPrecosView(\'fornecedor\')"><i class="ti ti-truck"></i> Por fornecedor</button>';
+  toolbar+='</div>';
+  toolbar+='<input type="text" id="precos-search" placeholder="Buscar..." oninput="renderPrecosView()" style="max-width:240px">';
+  toolbar+='</div></div>';
+
+  const q=(document.getElementById('precos-search')?.value||'').toLowerCase();
+
+  let html=toolbar;
+
+  if(precosViewMode==='produto'){
+    // Agrupar por produto > fornecedor
+    const porProduto={};
+    data.forEach(h=>{
+      if(q&&!h.produto_nome.toLowerCase().includes(q))return;
+      if(!porProduto[h.produto_nome])porProduto[h.produto_nome]={categoria:h.categoria,fornecedores:{}};
+      if(!porProduto[h.produto_nome].fornecedores[h.fornecedor])porProduto[h.produto_nome].fornecedores[h.fornecedor]=[];
+      porProduto[h.produto_nome].fornecedores[h.fornecedor].push(h);
+    });
+
+    const produtosOrdenados=Object.keys(porProduto).sort();
+    if(!produtosOrdenados.length){
+      html+='<div class="empty">Nenhum resultado encontrado.</div>';
+    }
+    produtosOrdenados.forEach(prod=>{
+      const info=porProduto[prod];
+      html+='<div class="card" style="margin-bottom:12px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+      html+='<div style="font-size:15px;font-weight:700;color:var(--c-text)">'+prod+'</div>';
+      html+='<div style="font-size:11px;color:var(--c-dim);background:var(--c-bg);padding:3px 10px;border-radius:999px">'+(info.categoria||'—')+'</div>';
+      html+='</div>';
+
+      const fornsOrdenados=Object.keys(info.fornecedores).sort();
+      fornsOrdenados.forEach(forn=>{
+        const hist=info.fornecedores[forn].sort((a,b)=>new Date(b.registrado_em)-new Date(a.registrado_em));
+        const atual=hist[0];
+        const anterior=hist[1];
+        let variacao='';
+        if(anterior){
+          const diff=atual.valor_unit-anterior.valor_unit;
+          const pct=anterior.valor_unit>0?Math.round(diff/anterior.valor_unit*100):0;
+          const cor=diff>0?'#D63B3B':diff<0?'#1A8A55':'#9DA3B4';
+          const seta=diff>0?'↑':diff<0?'↓':'→';
+          variacao='<span style="color:'+cor+';font-weight:600;font-size:12px;margin-left:8px">'+seta+' '+Math.abs(pct)+'%</span>';
+        }
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--c-border)">';
+        html+='<div><span style="font-weight:500;color:var(--c-accent)">'+forn+'</span>';
+        html+='<span style="font-size:11px;color:var(--c-dim);margin-left:8px">'+hist.length+' registro(s)</span></div>';
+        html+='<div style="text-align:right"><span style="font-weight:700;font-size:15px">'+fmtNum(atual.valor_unit)+'</span>'+variacao;
+        html+='<div style="font-size:10px;color:var(--c-dim2)">'+new Date(atual.registrado_em).toLocaleDateString('pt-BR')+'</div></div>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+  } else {
+    // Agrupar por fornecedor > produto
+    const porForn={};
+    data.forEach(h=>{
+      if(q&&!h.fornecedor.toLowerCase().includes(q)&&!h.produto_nome.toLowerCase().includes(q))return;
+      if(!porForn[h.fornecedor])porForn[h.fornecedor]={};
+      if(!porForn[h.fornecedor][h.produto_nome])porForn[h.fornecedor][h.produto_nome]=[];
+      porForn[h.fornecedor][h.produto_nome].push(h);
+    });
+
+    const fornsOrdenados=Object.keys(porForn).sort();
+    if(!fornsOrdenados.length){
+      html+='<div class="empty">Nenhum resultado encontrado.</div>';
+    }
+    fornsOrdenados.forEach(forn=>{
+      const produtos=porForn[forn];
+      const qtdProdutos=Object.keys(produtos).length;
+      html+='<div class="card" style="margin-bottom:12px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+      html+='<div style="font-size:15px;font-weight:700;color:var(--c-accent)">'+forn+'</div>';
+      html+='<div style="font-size:11px;color:var(--c-dim)">'+qtdProdutos+' produto(s)</div>';
+      html+='</div>';
+
+      Object.keys(produtos).sort().forEach(prod=>{
+        const hist=produtos[prod].sort((a,b)=>new Date(b.registrado_em)-new Date(a.registrado_em));
+        const atual=hist[0];
+        const anterior=hist[1];
+        let variacao='';
+        if(anterior){
+          const diff=atual.valor_unit-anterior.valor_unit;
+          const pct=anterior.valor_unit>0?Math.round(diff/anterior.valor_unit*100):0;
+          const cor=diff>0?'#D63B3B':diff<0?'#1A8A55':'#9DA3B4';
+          const seta=diff>0?'↑':diff<0?'↓':'→';
+          variacao='<span style="color:'+cor+';font-weight:600;font-size:12px;margin-left:8px">'+seta+' '+Math.abs(pct)+'%</span>';
+        }
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--c-border)">';
+        html+='<div><span style="font-weight:500">'+prod+'</span>';
+        html+='<span style="font-size:11px;color:var(--c-dim);margin-left:8px">'+hist.length+' registro(s)</span></div>';
+        html+='<div style="text-align:right"><span style="font-weight:700;font-size:15px">'+fmtNum(atual.valor_unit)+'</span>'+variacao;
+        html+='<div style="font-size:10px;color:var(--c-dim2)">'+new Date(atual.registrado_em).toLocaleDateString('pt-BR')+'</div></div>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+  }
+
+  el.innerHTML=html;
 }
 
 async function renderRelatorio(){
