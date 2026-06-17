@@ -1275,6 +1275,14 @@ async function renderHistoricoPrecos(){
   renderPrecosView();
 }
 
+
+function limparFiltrosPrecos(){
+  const s=document.getElementById('precos-search');if(s)s.value='';
+  const c=document.getElementById('precos-cat');if(c)c.value='';
+  const f=document.getElementById('precos-forn');if(f)f.value='';
+  renderPrecosView();
+}
+
 function setPrecosView(mode){
   precosViewMode=mode;
   renderPrecosView();
@@ -1284,16 +1292,37 @@ function renderPrecosView(){
   const el=document.getElementById('area-precos');
   const data=precosCache;
 
+  // Listas únicas para os filtros
+  const catsUnicas=[...new Set(data.map(h=>h.categoria).filter(Boolean))].sort();
+  const fornsUnicos=[...new Set(data.map(h=>h.fornecedor).filter(Boolean))].sort();
+  const catFiltroAtual=document.getElementById('precos-cat')?.value||'';
+  const fornFiltroAtual=document.getElementById('precos-forn')?.value||'';
+
   let toolbar='<div class="card" style="margin-bottom:12px;padding:14px 16px">';
-  toolbar+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">';
+  toolbar+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">';
   toolbar+='<div style="display:flex;gap:6px">';
   toolbar+='<button class="sort-btn'+(precosViewMode==='produto'?' active':'')+'" onclick="setPrecosView(\'produto\')"><i class="ti ti-package"></i> Por produto</button>';
   toolbar+='<button class="sort-btn'+(precosViewMode==='fornecedor'?' active':'')+'" onclick="setPrecosView(\'fornecedor\')"><i class="ti ti-truck"></i> Por fornecedor</button>';
   toolbar+='</div>';
-  toolbar+='<input type="text" id="precos-search" placeholder="Buscar..." oninput="renderPrecosView()" style="max-width:220px;padding:6px 10px;font-size:12px">';
+  toolbar+='<input type="text" id="precos-search" placeholder="Buscar produto ou fornecedor..." oninput="renderPrecosView()" value="'+(document.getElementById('precos-search')?.value||'')+'" style="max-width:240px;padding:6px 10px;font-size:12px">';
+  toolbar+='</div>';
+  toolbar+='<div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--c-border);padding-top:10px">';
+  toolbar+='<select id="precos-cat" onchange="renderPrecosView()" style="max-width:200px;padding:6px 10px;font-size:12px">';
+  toolbar+='<option value="">Todas as categorias</option>';
+  catsUnicas.forEach(c=>{toolbar+='<option value="'+c+'"'+(c===catFiltroAtual?' selected':'')+'>'+c+'</option>';});
+  toolbar+='</select>';
+  toolbar+='<select id="precos-forn" onchange="renderPrecosView()" style="max-width:200px;padding:6px 10px;font-size:12px">';
+  toolbar+='<option value="">Todos os fornecedores</option>';
+  fornsUnicos.forEach(f=>{toolbar+='<option value="'+f+'"'+(f===fornFiltroAtual?' selected':'')+'>'+f+'</option>';});
+  toolbar+='</select>';
+  if(catFiltroAtual||fornFiltroAtual||document.getElementById('precos-search')?.value){
+    toolbar+='<button class="btn btn-sm" onclick="limparFiltrosPrecos()"><i class="ti ti-x"></i> Limpar filtros</button>';
+  }
   toolbar+='</div></div>';
 
   const q=(document.getElementById('precos-search')?.value||'').toLowerCase();
+  const catFiltro=catFiltroAtual;
+  const fornFiltro=fornFiltroAtual;
   let html=toolbar;
 
   function variacaoHtml(atual,anterior){
@@ -1308,7 +1337,9 @@ function renderPrecosView(){
   if(precosViewMode==='produto'){
     const porProduto={};
     data.forEach(h=>{
-      if(q&&!h.produto_nome.toLowerCase().includes(q))return;
+      if(q&&!h.produto_nome.toLowerCase().includes(q)&&!h.fornecedor.toLowerCase().includes(q))return;
+      if(catFiltro&&h.categoria!==catFiltro)return;
+      if(fornFiltro&&h.fornecedor!==fornFiltro)return;
       if(!porProduto[h.produto_nome])porProduto[h.produto_nome]={categoria:h.categoria,fornecedores:{}};
       if(!porProduto[h.produto_nome].fornecedores[h.fornecedor])porProduto[h.produto_nome].fornecedores[h.fornecedor]=[];
       porProduto[h.produto_nome].fornecedores[h.fornecedor].push(h);
@@ -1359,6 +1390,8 @@ function renderPrecosView(){
     const porForn={};
     data.forEach(h=>{
       if(q&&!h.fornecedor.toLowerCase().includes(q)&&!h.produto_nome.toLowerCase().includes(q))return;
+      if(catFiltro&&h.categoria!==catFiltro)return;
+      if(fornFiltro&&h.fornecedor!==fornFiltro)return;
       if(!porForn[h.fornecedor])porForn[h.fornecedor]={};
       if(!porForn[h.fornecedor][h.produto_nome])porForn[h.fornecedor][h.produto_nome]=[];
       porForn[h.fornecedor][h.produto_nome].push(h);
