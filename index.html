@@ -1563,18 +1563,28 @@ function gerarRelatorioProvisorio(){
     const datas=s.data_inicio&&s.data_fim?' ('+fmtD2(s.data_inicio)+' a '+fmtD2(s.data_fim)+')':'';
     return '<option value="'+s.id+'">'+s.nome+datas+'</option>';
   }).join('');
+  const restOpts=C.restaurantes.map(r=>'<option value="'+r.id+'">'+r.nome+'</option>').join('');
 
   showModal(
     '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:4px;display:flex;align-items:center;gap:8px">'
     +'<i class="ti ti-file-analytics" style="color:var(--c-accent);font-size:18px"></i> Relatório de Compras'
     +'</div>'
-    +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:16px">Escolha a semana para gerar o relatório provisório</div>'
-    +'<div class="field" style="margin-bottom:18px">'
+    +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:16px">Escolha os filtros para gerar o relatório</div>'
+    +'<div class="grid2f" style="margin-bottom:14px">'
+    +'<div class="field">'
     +'<label>Semana</label>'
     +'<select id="rp-semana" style="width:100%">'
-    +'<option value="">— Todas as semanas ativas —</option>'
+    +'<option value="">— Todas as semanas —</option>'
     +semsOpts
     +'</select>'
+    +'</div>'
+    +'<div class="field">'
+    +'<label>Restaurante</label>'
+    +'<select id="rp-rest" style="width:100%">'
+    +'<option value="">— Todos os restaurantes —</option>'
+    +restOpts
+    +'</select>'
+    +'</div>'
     +'</div>'
     +'<div class="g8" style="justify-content:flex-end">'
     +'<button class="btn" onclick="closeModal()">Cancelar</button>'
@@ -1585,11 +1595,12 @@ function gerarRelatorioProvisorio(){
 
 function confirmarRelatorioProvisorio(){
   const semFiltro=document.getElementById('rp-semana')?.value||'';
+  const restFiltro=document.getElementById('rp-rest')?.value||'';
   closeModal();
-  _gerarRelatorioProvisorio(semFiltro);
+  _gerarRelatorioProvisorio(semFiltro, restFiltro);
 }
 
-function _gerarRelatorioProvisorio(semFiltro){
+function _gerarRelatorioProvisorio(semFiltro, restFiltro){
   const agora=new Date();
   const restCores2={'Arvo':'#4A6741','Terra':'#8B5E3C','Voar':'#6B2D4A'};
   function rc(nome){return restCores2[nome]||'#3B6FE8';}
@@ -1635,7 +1646,7 @@ function _gerarRelatorioProvisorio(semFiltro){
   html+='.chip-pr{background:#FEF0E0;color:#B86010}';
   html+='.chip-ag{background:#F0F1F5;color:#6B7080}';
   html+='.footer{margin-top:28px;padding-top:14px;border-top:1px solid #E8E9EF;display:flex;justify-content:space-between;font-size:10px;color:#9DA3B4}';
-  html+='@media print{body{background:#fff}.page{padding:16px}.no-print{display:none}@page{margin:10mm;size:A4}}';
+  html+='@media print{body{background:#fff;font-size:10.5px}.page{padding:10px}.no-print{display:none}@page{margin:5mm;size:A4}.rest-section{page-break-inside:avoid;margin-bottom:8px}.rest-header{padding:6px 12px}.rst{padding:6px 10px}.rst-l{font-size:9px;margin-bottom:2px}.rst-v{font-size:12px}th{padding:4px 8px!important;font-size:9px!important}td{padding:4px 8px!important;font-size:10px!important}.prog-wrap{padding:5px 10px}.footer{margin-top:10px;padding-top:8px}h1{font-size:14px}}';
   html+='</style></head><body>';
   html+='<div class="no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">';
   html+='<button onclick="window.print()" style="background:#1C1E2E;color:#fff;border:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">🖨 Imprimir</button>';
@@ -1657,7 +1668,8 @@ function _gerarRelatorioProvisorio(semFiltro){
   html+='</div></div>';
 
   // Seção por restaurante
-  C.restaurantes.forEach(r=>{
+  const restsFiltrados=restFiltro?C.restaurantes.filter(r=>r.id===restFiltro):C.restaurantes;
+  restsFiltrados.forEach(r=>{
     const cor=rc(r.nome);
     const peds=C.pedidos.filter(p=>p.restaurante_id===r.id&&(!semFiltro||p.semana_id===semFiltro));
     if(!peds.length)return;
