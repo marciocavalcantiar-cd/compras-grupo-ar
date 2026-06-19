@@ -656,6 +656,96 @@ function irParaPedido(){
   openNovoPedido(semId||null);
 }
 
+
+function abrirModalNovoProduto(){
+  // Salvar estado atual do modal de pedido
+  const fornAtual=document.getElementById('np-t')?.value||'';
+  const dataAtual=document.getElementById('np-d')?.value||'';
+
+  const catsOpts=C.categorias.map(c=>`<option value="${c.nome}"${c.nome===ncCat?' selected':''}>${c.nome}</option>`).join('');
+
+  showModal(`
+    <div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:4px;display:flex;align-items:center;gap:8px">
+      <i class="ti ti-package" style="color:var(--c-accent);font-size:18px"></i> Novo produto
+    </div>
+    <div style="font-size:12px;color:var(--c-dim);margin-bottom:16px">Cadastre um novo produto para usar nos pedidos</div>
+    <div class="grid2f" style="margin-bottom:12px">
+      <div class="field">
+        <label>Nome do produto *</label>
+        <input id="prd-nome" type="text" placeholder="Ex: Filé de Tilápia" style="width:100%" autofocus>
+      </div>
+      <div class="field">
+        <label>Unidade de medida *</label>
+        <select id="prd-unidade" style="width:100%">
+          <option value="KG">KG — Quilograma</option>
+          <option value="UN">UN — Unidade</option>
+          <option value="LT">LT — Litro</option>
+          <option value="CX">CX — Caixa</option>
+          <option value="PC">PC — Pacote</option>
+          <option value="BD">BD — Bandeja</option>
+          <option value="FD">FD — Fardo</option>
+          <option value="GL">GL — Galão</option>
+          <option value="GR">GR — Grama</option>
+          <option value="ML">ML — Mililitro</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:16px">
+      <label>Categoria *</label>
+      <select id="prd-cat" style="width:100%">${catsOpts}</select>
+    </div>
+    <div class="g8" style="justify-content:flex-end">
+      <button class="btn" onclick="openNovoPedido(pedSemId)">Voltar ao pedido</button>
+      <button class="btn btn-acc" onclick="salvarNovoProduto('${fornAtual}','${dataAtual}')">
+        <i class="ti ti-check"></i> Salvar produto
+      </button>
+    </div>
+  `);
+}
+
+async function salvarNovoProduto(fornAtual, dataAtual){
+  const nome=document.getElementById('prd-nome')?.value.trim();
+  const unidade=document.getElementById('prd-unidade')?.value||'KG';
+  const categoria=document.getElementById('prd-cat')?.value;
+
+  if(!nome){toast('Informe o nome do produto');return;}
+  if(!categoria){toast('Selecione uma categoria');return;}
+
+  // Verificar se já existe
+  const existe=C.produtos.find(p=>p.nome.toLowerCase()===nome.toLowerCase()&&p.categoria===categoria);
+  if(existe){
+    toast('Produto já cadastrado!');
+    ncCat=categoria;
+    openNovoPedido(pedSemId);
+    setTimeout(()=>{
+      if(fornAtual)document.getElementById('np-t').value=fornAtual;
+      if(dataAtual)document.getElementById('np-d').value=dataAtual;
+      document.getElementById('np-s').value=nome;
+      filtrarNp();
+    },100);
+    return;
+  }
+
+  const {data:novo,error}=await supa.from('produtos').insert({
+    nome,unidade,categoria
+  }).select().single();
+
+  if(error){toast('Erro ao salvar: '+error.message);return;}
+
+  C.produtos.push(novo);
+  toast('Produto "'+nome+'" cadastrado!');
+
+  // Voltar ao modal de pedido com o produto já filtrado
+  ncCat=categoria;
+  openNovoPedido(pedSemId);
+  setTimeout(()=>{
+    if(fornAtual)document.getElementById('np-t').value=fornAtual;
+    if(dataAtual)document.getElementById('np-d').value=dataAtual;
+    document.getElementById('np-s').value=nome;
+    filtrarNp();
+  },100);
+}
+
 function openNovoPedido(semId){
   pedSemId=semId||null;ncSel={};
   ncCat=C.categorias[0]?.nome||'';
@@ -676,7 +766,7 @@ function openNovoPedido(semId){
     <div class="field">
       <label>Categoria</label>
       <div id="np-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${pills}</div>
-      <label style="display:block;font-size:11px;font-weight:500;color:var(--ar-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Buscar produto</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label style="display:block;font-size:11px;font-weight:500;color:var(--ar-dim);text-transform:uppercase;letter-spacing:0.07em">Buscar produto</label><button class="btn btn-sm" onclick="abrirModalNovoProduto()" style="font-size:11px;padding:3px 8px"><i class="ti ti-plus"></i> Novo produto</button></div>
       <input id="np-s" type="text" placeholder="Digite para filtrar..." oninput="filtrarNp()" style="width:100%;margin-bottom:10px">
       <div class="prod-list" id="np-list"></div>
     </div>
