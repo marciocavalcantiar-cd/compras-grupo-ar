@@ -2052,7 +2052,7 @@ function _gerarRelatorioProvisorio(semFiltro, restFiltro){
     html+='<div class="rst"><div class="rst-l">Entregue</div><div class="rst-v green">'+fmtNum(entregue)+'</div></div>';
     html+='<div class="rst"><div class="rst-l">Previsto/trânsito</div><div class="rst-v orange">'+fmtNum(previsto)+'</div></div>';
     html+='<div class="rst"><div class="rst-l">Aguardando</div><div class="rst-v gray">'+fmtNum(aguardando)+'</div></div>';
-    html+='<div class="rst"><div class="rst-l">Entregues / Total</div><div class="rst-v">'+itens.length+' / '+peds.length+'</div></div>';
+    html+='<div class="rst"><div class="rst-l">Entregues / Total</div><div class="rst-v">'+itens.filter(function(i){return i.status==='Entregue';}).length+' / '+itens.length+'</div></div>';
     html+='</div>';
     html+='<div class="prog-wrap">';
     html+='<div class="prog"><div class="prog-fill" style="width:'+pct+'%;background:'+cor+'"></div></div>';
