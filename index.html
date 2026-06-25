@@ -183,7 +183,33 @@
   </style>
 </head>
 <body>
-<div class="layout">
+
+<!-- TELA DE LOGIN -->
+<div id="login-screen" style="position:fixed;inset:0;background:#F5F6FA;display:flex;align-items:center;justify-content:center;z-index:9999">
+  <div style="background:#fff;border:1px solid #E8E9EF;border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.10)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="width:56px;height:56px;background:#D4861A;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+        <img id="login-logo" style="width:40px;height:40px;object-fit:contain">
+      </div>
+      <div style="font-size:20px;font-weight:700;color:#1C1E2E;letter-spacing:-0.02em">Plataforma de Compras</div>
+      <div style="font-size:13px;color:#6B7080;margin-top:4px">Grupo AR — Cozinha de Produção</div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#6B7080;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Senha de acesso</label>
+      <input id="login-senha" type="password" placeholder="Digite a senha..." 
+        style="width:100%;padding:10px 14px;font-size:14px;border:1.5px solid #D8DAE5;border-radius:8px;outline:none;font-family:inherit;transition:border-color 0.15s"
+        onfocus="this.style.borderColor='#3B6FE8'" 
+        onblur="this.style.borderColor='#D8DAE5'"
+        onkeydown="if(event.key==='Enter')tentarLogin()">
+      <div id="login-erro" style="color:#D63B3B;font-size:12px;margin-top:6px;display:none">Senha incorreta. Tente novamente.</div>
+    </div>
+    <button onclick="tentarLogin()" style="width:100%;background:#3B6FE8;color:#fff;border:none;padding:11px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background 0.15s" onmouseover="this.style.background='#2B5FD0'" onmouseout="this.style.background='#3B6FE8'">
+      Entrar
+    </button>
+  </div>
+</div>
+
+<div class="layout" id="app-layout" style="display:none">
 
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
@@ -264,6 +290,7 @@
   </div>
 </div>
 
+</div><!-- /app-layout -->
 <div id="overlay" class="overlay" onclick="handleOverlayClick(event)">
   <div class="mbox" id="mbox"></div>
 </div>
@@ -304,6 +331,45 @@ function showPage(id,btn){
   if(btn)btn.classList.add('active');
   if(id==='pedidos')renderPedidos();
   if(id==='dashboard')renderDashboard();
+}
+
+
+// ── AUTENTICAÇÃO ──────────────────────────────────────
+// Hash SHA-256 da senha "comprasAR2024" — troque conforme necessário
+const SENHA_HASH='48fd059010e68099a03637756a80d03c8b3d558e33f2969f14016bedbbfa1def';
+
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function tentarLogin(){
+  const senha=document.getElementById('login-senha')?.value||'';
+  if(!senha)return;
+  const hash=await sha256(senha);
+  if(hash===SENHA_HASH){
+    sessionStorage.setItem('ar_auth','1');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-layout').style.display='flex';
+    init();
+  } else {
+    const erro=document.getElementById('login-erro');
+    if(erro)erro.style.display='block';
+    document.getElementById('login-senha').value='';
+    document.getElementById('login-senha').focus();
+  }
+}
+
+function verificarAuth(){
+  if(sessionStorage.getItem('ar_auth')==='1'){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-layout').style.display='flex';
+    return true;
+  }
+  // Setar logo na tela de login
+  const logoEl=document.getElementById('login-logo');
+  if(logoEl)logoEl.src=logo_data;
+  return false;
 }
 
 async function init(){
@@ -1273,7 +1339,7 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
   const sems=[...new Set(rows.map(r=>r.semNome))].filter(s=>s!=='—').join(', ');
   const rests=[...new Set(rows.map(r=>r.restNome))].join(', ');
   const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    +'<title>Espelho Geral</title>'
+    +'<title>Espelho Geral — '+dataArquivo()+'</title>'
     +'<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#222;background:#fff}'
     +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}'
     +'h1{font-size:18px;font-weight:700;margin:0}p{font-size:12px;color:#888;margin:4px 0 0}'
@@ -1309,9 +1375,14 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
     +'</table>'
     +'<div class="sig"><div class="s">Responsável pelo recebimento</div><div class="s">Conferente / Estoquista</div><div class="s">Aprovação</div></div>'
     +'</body></html>';
-  abrirEspelhoModal(html,'Espelho Geral de Recebimento');
+  abrirEspelhoModal(html,'Espelho Geral de Recebimento ('+dataArquivo()+')');
 }
 
+
+function dataArquivo(){
+  const d=new Date();
+  const dd=String(d.getDate()).padStart(2,'0');const mm=String(d.getMonth()+1).padStart(2,'0');const yy=d.getFullYear();return dd+'-'+mm+'-'+yy;
+}
 
 function gerarEspelho(semId){
   const sem=C.semanas.find(s=>s.id===semId);
@@ -1356,7 +1427,7 @@ function gerarEspelho(semId){
       +'</tr>';
   });
   const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    +'<title>Espelho — '+sem.nome+'</title>'
+    +'<title>Espelho — '+sem.nome+' — '+dataArquivo()+'</title>'
     +'<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#222;background:#fff}'
     +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}'
     +'h1{font-size:18px;font-weight:700;margin:0}p{font-size:12px;color:#888;margin:4px 0 0}'
@@ -1391,7 +1462,7 @@ function gerarEspelho(semId){
     +'</table>'
     +'<div class="sig"><div class="s">Responsável pelo recebimento</div><div class="s">Conferente / Estoquista</div></div>'
     +'</body></html>';
-  abrirEspelhoModal(html,'Espelho — '+sem.nome);
+  abrirEspelhoModal(html,'Espelho — '+sem.nome+' ('+dataArquivo()+')');
 }
 
 
@@ -1898,7 +1969,7 @@ function _gerarRelatorioProvisorio(semFiltro, restFiltro){
     .map(s=>s.nome+(s.data_inicio&&s.data_fim?' ('+new Date(s.data_inicio+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' a '+new Date(s.data_fim+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+')':'')).join(', ');
 
   let html='<!DOCTYPE html><html><head><meta charset="UTF-8">';
-  html+='<title>Relatório de Compras — Grupo AR</title>';
+  html+='<title>Relatório de Compras — Grupo AR — '+dataArquivo()+'</title>';
   html+='<style>';
   html+='*{box-sizing:border-box;margin:0;padding:0}';
   html+='body{font-family:Arial,sans-serif;background:#fff;color:#1C1E2E;font-size:13px}';
@@ -2032,7 +2103,7 @@ function _gerarRelatorioProvisorio(semFiltro, restFiltro){
   html+='</div>';
   html+='</div></body></html>';
 
-  abrirEspelhoModal(html,'Relatório Provisório de Compras');
+  abrirEspelhoModal(html,'Relatório de Compras ('+dataArquivo()+')');
 }
 
 
@@ -2040,7 +2111,7 @@ function showModal(html){document.getElementById('mbox').innerHTML=html;document
 function closeModal(){document.getElementById('overlay').classList.remove('open')}
 function handleOverlayClick(e){if(e.target===document.getElementById('overlay'))closeModal()}
 
-init();
+if(!verificarAuth()){document.getElementById('login-logo').src=logo_data;}
 </script>
 </body>
 </html>
