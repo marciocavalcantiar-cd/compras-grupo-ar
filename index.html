@@ -282,6 +282,7 @@ const NS={'Aguardando':'Previsto','Previsto':'Entregue','Entregue':'Aguardando'}
 let C={restaurantes:[],pedidos:[],itens:[],produtos:[],categorias:[],semanas:[]};
 let restAtivo=null,ncCat='',ncSel={},pedSemId=null;
 let mesSelecionado=null;
+const semsAbertas=new Set();
 let sortKey='categoria',sortDir=1;
 
 function toast(msg,d=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),d)}
@@ -526,7 +527,7 @@ function renderSemanaCard(s,allPeds){
   const entregues=peds.filter(p=>p.status==='Entregue').length;
   const pct=peds.length?Math.round(entregues/peds.length*100):0;
   const tabelaHtml=peds.length?renderTabelaItens(peds,false):'<div style="font-size:13px;color:var(--ar-dim);padding:8px 0">Nenhum pedido. Clique em "+ Pedido" para adicionar.</div>';
-  return `<div class="semana-card" id="sem-${s.id}">
+  return `<div class="semana-card${semsAbertas.has(s.id)?'':' semana-collapsed'}" id="sem-${s.id}">
     <div class="semana-head" onclick="toggleSem('${s.id}')">
       <div style="flex:1;min-width:0">
         <div style="font-size:15px;font-weight:500;color:var(--ar-white)">${s.nome}</div>
@@ -641,9 +642,17 @@ function toggleSem(id){
   const el=document.getElementById('sem-'+id);
   const ic=document.getElementById('icsem-'+id);
   if(!el)return;
-  el.classList.toggle('semana-collapsed');
-  ic.className=el.classList.contains('semana-collapsed')?'ti ti-chevron-right':'ti ti-chevron-down';
-  ic.style.cssText='color:var(--ar-dim);font-size:14px';
+  if(semsAbertas.has(id)){
+    semsAbertas.delete(id);
+    el.classList.add('semana-collapsed');
+  } else {
+    semsAbertas.add(id);
+    el.classList.remove('semana-collapsed');
+  }
+  if(ic){
+    ic.className=el.classList.contains('semana-collapsed')?'ti ti-chevron-right':'ti ti-chevron-down';
+    ic.style.cssText='color:var(--ar-dim);font-size:14px';
+  }
 }
 
 async function confirmarItem(itemId,pedId){
