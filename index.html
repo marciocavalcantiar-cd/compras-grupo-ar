@@ -592,12 +592,16 @@ function renderSemanaCard(s,allPeds){
   const totalSem=peds.reduce((a,p)=>a+(p.total||0),0);
   const entregues=peds.filter(p=>p.status==='Entregue').length;
   const pct=peds.length?Math.round(entregues/peds.length*100):0;
+  // Calcular pct pelos itens para maior precisão
+  const todosItens=allPeds.filter(p=>p.semana_id===s.id).flatMap(p=>C.itens.filter(i=>i.pedido_id===p.id));
+  const itensEntregues=todosItens.filter(i=>i.status==='Entregue').length;
+  const pctReal=todosItens.length?Math.round(itensEntregues/todosItens.length*100):pct;
   const tabelaHtml=peds.length?renderTabelaItens(peds,false):'<div style="font-size:13px;color:var(--ar-dim);padding:8px 0">Nenhum pedido. Clique em "+ Pedido" para adicionar.</div>';
   return `<div class="semana-card${semsAbertas.has(s.id)?'':' semana-collapsed'}" id="sem-${s.id}">
     <div class="semana-head" onclick="toggleSem('${s.id}')">
       <div style="flex:1;min-width:0">
         <div style="font-size:15px;font-weight:500;color:var(--ar-white)">${s.nome}</div>
-        <div style="font-size:12px;color:var(--ar-dim);margin-top:2px">${C.restaurantes.find(r=>r.id===restAtivo)?.nome||""} · ${fmtD(s.data_inicio)} a ${fmtD(s.data_fim)} · ${peds.length} pedido(s) · ${fmt(totalSem)} · ${pct}% entregue</div>
+        <div style="font-size:12px;color:var(--ar-dim);margin-top:2px">${C.restaurantes.find(r=>r.id===restAtivo)?.nome||""} · ${fmtD(s.data_inicio)} a ${fmtD(s.data_fim)} · ${peds.length} pedido(s) · ${fmt(totalSem)} · ${pctReal}% entregue</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <button class="btn btn-sm" onclick="event.stopPropagation();openNovoPedido('${s.id}')"><i class="ti ti-plus"></i> Pedido</button>
@@ -609,7 +613,7 @@ function renderSemanaCard(s,allPeds){
       </div>
     </div>
     <div class="semana-body">
-      <div class="progress-bar" style="margin-bottom:12px"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-bar" style="margin-bottom:12px"><div class="progress-fill" style="width:${pctReal}%"></div></div>
       ${tabelaHtml}
     </div>
   </div>`;
