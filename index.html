@@ -336,7 +336,7 @@ function showPage(id,btn){
 
 // ── AUTENTICAÇÃO ──────────────────────────────────────
 // Hash SHA-256 da senha "comprasAR2024" — troque conforme necessário
-const SENHA_HASH='48fd059010e68099a03637756a80d03c8b3d558e33f2969f14016bedbbfa1def';
+const SENHA_HASH='209d5c1c019d79321b1c4f0bfdcb4a841c63627acd2f9ef05a025f5b26129e95';
 
 async function sha256(str){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
