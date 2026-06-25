@@ -383,18 +383,36 @@ function renderMesesGrid(el){
   const peds=C.pedidos.filter(p=>p.restaurante_id===restAtivo);
   const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  // Agrupar pedidos por mês/ano
+  // Agrupar por mês — incluindo semanas sem pedidos
+  // Usar data_inicio E data_fim para semanas que cruzam meses
   const porMes={};
+  function addMes(mes, ano, semId, total=0, isPed=false){
+    const k=ano+'-'+String(mes).padStart(2,'0');
+    if(!porMes[k])porMes[k]={mes,ano,total:0,peds:0,semanas:new Set()};
+    porMes[k].semanas.add(semId);
+    if(isPed){porMes[k].total+=total;porMes[k].peds++;}
+  }
+
+  // Incluir TODAS as semanas (mesmo sem pedidos)
+  C.semanas.forEach(s=>{
+    if(!s.data_inicio)return;
+    const di=new Date(s.data_inicio+'T12:00');
+    addMes(di.getMonth()+1, di.getFullYear(), s.id);
+    // Se a semana cruza para outro mês, adicionar lá também
+    if(s.data_fim){
+      const df=new Date(s.data_fim+'T12:00');
+      if(df.getMonth()!==di.getMonth()||df.getFullYear()!==di.getFullYear()){
+        addMes(df.getMonth()+1, df.getFullYear(), s.id);
+      }
+    }
+  });
+
+  // Adicionar totais dos pedidos
   peds.forEach(p=>{
     if(!p.semana_id)return;
-    // Usar a data de início da semana para agrupar
     const sem=C.semanas.find(s=>s.id===p.semana_id);
     const d=sem?.data_inicio?new Date(sem.data_inicio+'T12:00'):new Date(p.data||Date.now());
-    const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[k])porMes[k]={mes:d.getMonth()+1,ano:d.getFullYear(),total:0,peds:0,semanas:new Set()};
-    porMes[k].total+=(parseFloat(p.total)||0);
-    porMes[k].peds++;
-    porMes[k].semanas.add(p.semana_id);
+    addMes(d.getMonth()+1, d.getFullYear(), p.semana_id, parseFloat(p.total)||0, true);
   });
 
   const restNome=C.restaurantes.find(r=>r.id===restAtivo)?.nome||'';
@@ -455,9 +473,17 @@ function renderSemanasDoMes(el, mes, ano){
     return d.getMonth()+1===mes&&d.getFullYear()===ano;
   });
 
-  // Semanas deste mês que têm pedidos
-  const semIds=[...new Set(peds.map(p=>p.semana_id).filter(Boolean))];
-  const sems=C.semanas.filter(s=>semIds.includes(s.id));
+  // Semanas deste mês (com ou sem pedidos)
+  const sems=C.semanas.filter(s=>{
+    if(!s.data_inicio)return false;
+    const di=new Date(s.data_inicio+'T12:00');
+    if(di.getMonth()+1===mes&&di.getFullYear()===ano)return true;
+    if(s.data_fim){
+      const df=new Date(s.data_fim+'T12:00');
+      if(df.getMonth()+1===mes&&df.getFullYear()===ano)return true;
+    }
+    return false;
+  });
 
   const totalMes=peds.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
 
