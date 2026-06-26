@@ -238,6 +238,9 @@
       <button class="sb-item" onclick="openNovaSemana()" title="Nova semana">
         <i class="ti ti-calendar-plus"></i><span>Nova semana</span>
       </button>
+      <button class="sb-item" onclick="abrirRelatorioFinanceiro()" title="Relatório Financeiro">
+        <i class="ti ti-table"></i><span>Rel. Financeiro</span>
+      </button>
       <button class="sb-item" onclick="gerarEspelhoGeral()" title="Espelho geral">
         <i class="ti ti-printer"></i><span>Espelho geral</span>
       </button>
@@ -1486,6 +1489,171 @@ function gerarEspelho(semId){
 
 
 
+
+
+
+function selecionarTodasSems(val){
+  document.querySelectorAll('.sem-check').forEach(c=>c.checked=val);
+}
+
+function abrirRelatorioFinanceiro(){
+  // Ordenar semanas por data
+  const sems=[...C.semanas].sort((a,b)=>(a.data_inicio||'').localeCompare(b.data_inicio||''));
+  const fmtD2=d=>{if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;};
+
+  const semsHtml=sems.map(s=>{
+    const label=s.nome+(s.data_inicio&&s.data_fim?' ('+fmtD2(s.data_inicio)+' a '+fmtD2(s.data_fim)+')':'');
+    return '<label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);cursor:pointer;font-size:13px">'
+      +'<input type="checkbox" value="'+s.id+'" class="sem-check" checked style="accent-color:var(--c-accent);width:15px;height:15px;flex-shrink:0">'
+      +'<span>'+label+'</span>'
+      +'</label>';
+  }).join('');
+
+  showModal(
+    '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:4px;display:flex;align-items:center;gap:8px">'
+    +'<i class="ti ti-table" style="color:var(--c-accent);font-size:18px"></i> Relatório Financeiro'
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:14px">Selecione as semanas que devem constar no relatório</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<button class="btn btn-sm" onclick="selecionarTodasSems(true)">Todas</button>'
+    +'<button class="btn btn-sm" onclick="selecionarTodasSems(false)">Nenhuma</button>'
+    +'</div>'
+    +'<div style="max-height:280px;overflow-y:auto;margin-bottom:16px">'+semsHtml+'</div>'
+    +'<div class="g8" style="justify-content:flex-end">'
+    +'<button class="btn" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-acc" onclick="gerarRelatorioFinanceiro()"><i class="ti ti-table"></i> Gerar relatório</button>'
+    +'</div>'
+  );
+}
+
+function gerarRelatorioFinanceiro(){
+  const semsSel=[...document.querySelectorAll('.sem-check:checked')].map(c=>c.value);
+  if(!semsSel.length){toast('Selecione ao menos uma semana');return;}
+  closeModal();
+  _gerarRelatorioFinanceiro(semsSel);
+}
+
+function _gerarRelatorioFinanceiro(semIds){
+  const fmtD2=d=>{if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;};
+  const sems=semIds.map(id=>C.semanas.find(s=>s.id===id)).filter(Boolean)
+    .sort((a,b)=>(a.data_inicio||'').localeCompare(b.data_inicio||''));
+
+  const rests=C.restaurantes;
+  const restCores={'Arvo':'#4A6741','Terra':'#8B5E3C','Voar':'#6B2D4A'};
+  const restBg={'Arvo':'#EAF2E8','Terra':'#F5EDE6','Voar':'#F2E8EE'};
+  function rc(nome){return restCores[nome]||'#3B6FE8';}
+  function rb(nome){return restBg[nome]||'#EEF0F6';}
+
+  // Calcular total por restaurante por semana
+  const totais={};
+  rests.forEach(r=>{
+    totais[r.id]={};
+    sems.forEach(s=>{
+      const peds=C.pedidos.filter(p=>p.restaurante_id===r.id&&p.semana_id===s.id);
+      const itens=peds.flatMap(p=>C.itens.filter(i=>i.pedido_id===p.id));
+      totais[r.id][s.id]=itens.reduce((sum,i)=>sum+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+    });
+  });
+
+  // Totais por semana (coluna)
+  const totalSem={};
+  sems.forEach(s=>{
+    totalSem[s.id]=rests.reduce((sum,r)=>sum+totais[r.id][s.id],0);
+  });
+
+  // Totais por restaurante (linha)
+  const totalRest={};
+  rests.forEach(r=>{
+    totalRest[r.id]=sems.reduce((sum,s)=>sum+totais[r.id][s.id],0);
+  });
+
+  // Total geral
+  const totalGeral=rests.reduce((sum,r)=>sum+totalRest[r.id],0);
+
+  // Período do relatório
+  const periodoInicio=sems[0]?.data_inicio?fmtD2(sems[0].data_inicio):'';
+  const periodoFim=sems[sems.length-1]?.data_fim?fmtD2(sems[sems.length-1].data_fim):'';
+  const periodo=periodoInicio&&periodoFim?periodoInicio+' a '+periodoFim:'';
+
+  // Construir HTML
+  let html='<!DOCTYPE html><html><head><meta charset="UTF-8">';
+  html+='<title>Relatório Financeiro — Grupo AR — '+dataArquivo()+'</title>';
+  html+='<style>';
+  html+='*{box-sizing:border-box;margin:0;padding:0}';
+  html+='body{font-family:Arial,sans-serif;background:#fff;padding:28px;color:#1C1E2E}';
+  html+='.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #1C1E2E}';
+  html+='.logo{width:48px;height:48px;padding:4px;border:1px solid #E8E9EF;border-radius:8px}';
+  html+='h1{font-size:18px;font-weight:700;letter-spacing:-0.01em}';
+  html+='.sub{font-size:12px;color:#6B7080;margin-top:3px}';
+  html+='table{width:100%;border-collapse:collapse;font-size:12px}';
+  html+='th{padding:9px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;border:1px solid #ddd;background:#1C1E2E;color:#fff}';
+  html+='th.th-loja{background:#1C1E2E;color:#fff;text-align:left;min-width:80px}';
+  html+='th.th-sem{background:#1C1E2E;color:#fff;min-width:110px}';
+  html+='th.th-total{background:#EF9F27;color:#1C1E2E}';
+  html+='td{padding:9px 12px;border:1px solid #ddd;text-align:right;font-size:12px}';
+  html+='td.td-loja{text-align:left;font-weight:700;font-size:13px}';
+  html+='tr.tr-total td{background:#1C1E2E;color:#EF9F27;font-weight:700;font-size:13px;border-color:#333}';
+  html+='tr.tr-total td.td-loja{color:#EF9F27}';
+  html+='.footer{margin-top:18px;font-size:10px;color:#9DA3B4;display:flex;justify-content:space-between;border-top:1px solid #E8E9EF;padding-top:10px}';
+  html+='@media print{body{padding:12px}@page{margin:8mm;size:A4 landscape}}';
+  html+='</style></head><body>';
+
+  // Cabeçalho
+  html+='<div class="header">';
+  html+='<div>';
+  html+='<h1>Relatório Financeiro de Compras</h1>';
+  html+='<div class="sub">Grupo AR — Cozinha de Produção'+(periodo?' — '+periodo:'')+'</div>';
+  html+='</div>';
+  html+='<img class="logo" src="'+logo_data+'">';
+  html+='</div>';
+
+  // Tabela
+  html+='<table>';
+
+  // Cabeçalho da tabela
+  html+='<thead><tr>';
+  html+='<th class="th-loja">Loja</th>';
+  sems.forEach(s=>{
+    const label=s.data_inicio&&s.data_fim?fmtD2(s.data_inicio)+' - '+fmtD2(s.data_fim):s.nome;
+    html+='<th class="th-sem">'+label+'</th>';
+  });
+  html+='<th class="th-total">TOTAL</th>';
+  html+='</tr></thead>';
+
+  // Linhas por restaurante
+  html+='<tbody>';
+  rests.forEach(r=>{
+    const bg=rb(r.nome);
+    const cor=rc(r.nome);
+    html+='<tr style="background:'+bg+'">';
+    html+='<td class="td-loja" style="color:'+cor+';border-left:4px solid '+cor+'">'+r.nome.toUpperCase()+'</td>';
+    sems.forEach(s=>{
+      const val=totais[r.id][s.id];
+      html+='<td style="color:'+(val>0?'#1C1E2E':'#9DA3B4')+'">'+fmtNum(val)+'</td>';
+    });
+    html+='<td style="font-weight:700;background:#fff3e0;color:#B86010">'+fmtNum(totalRest[r.id])+'</td>';
+    html+='</tr>';
+  });
+
+  // Linha de total
+  html+='<tr class="tr-total">';
+  html+='<td class="td-loja">TOTAL</td>';
+  sems.forEach(s=>{
+    html+='<td>'+fmtNum(totalSem[s.id])+'</td>';
+  });
+  html+='<td style="color:#EF9F27;font-size:14px">'+fmtNum(totalGeral)+'</td>';
+  html+='</tr>';
+  html+='</tbody></table>';
+
+  // Rodapé
+  html+='<div class="footer">';
+  html+='<span>Grupo AR — Cozinha de Produção — Plataforma de Compras</span>';
+  html+='<span>Gerado em '+new Date().toLocaleDateString('pt-BR')+' às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span>';
+  html+='</div>';
+  html+='</body></html>';
+
+  abrirEspelhoModal(html,'Relatório Financeiro ('+dataArquivo()+')');
+}
 
 function abrirEspelhoModal(html, titulo){
   let ov=document.getElementById('espelho-ov');
