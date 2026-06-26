@@ -664,7 +664,7 @@ function renderTabelaItens(peds,showToolbar){
       <td><input type="text" value="${r.med}" onchange="updItemMed('${r.itemId}',this.value)" style="width:52px;padding:3px 4px;font-size:12px;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--c-dim);font-family:inherit;text-align:center" onfocus="this.style.borderColor='var(--c-accent)'" onblur="this.style.borderColor='transparent'" title="Clique para editar a medida"></td>
       <td class="r"><input type="number" min="0" step="0.01" value="${r.valor}" onchange="updItemValor('${r.itemId}','${r.pedId}',this.value)" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--ar-border2);color:var(--ar-white);font-family:inherit" onfocus="this.style.borderColor='var(--ar-accent)'" onblur="this.style.borderColor='var(--ar-border2)'"></td>
       <td class="r"><input type="number" min="0" step="0.5" value="${r.qtd||''}" onchange="updItemQtd('${r.itemId}','${r.pedId}',this.value)" style="width:60px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--ar-border2);color:var(--ar-white);font-family:inherit" onfocus="this.style.borderColor='var(--ar-accent)'" onblur="this.style.borderColor='var(--ar-border2)'"></td>
-      <td class="forn" style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${r.forn}</td>
+      <td class="forn" style="max-width:150px"><input type="text" value="${r.forn}" onchange="updItemForn('${r.itemId}','${r.pedId}',this.value)" style="width:100%;padding:3px 4px;font-size:13px;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--c-accent);font-family:inherit;font-weight:500" onfocus="this.style.borderColor='var(--c-accent)'" onblur="this.style.borderColor='transparent'" title="Clique para editar o fornecedor"></td>
       <td class="r" style="font-weight:500" id="sub-${r.itemId}">${sub>0?fmt(sub):'—'}</td>
       <td style="white-space:nowrap;display:flex;align-items:center;gap:4px">${sbadge} ${confirmar}<button class="btn-xs btn-del" onclick="delItem('${r.itemId}','${r.pedId}')" title="Excluir item" style="padding:2px 6px;color:var(--ar-red);border-color:transparent"><i class="ti ti-trash" style="font-size:12px"></i></button></td>
     </tr>`;
@@ -752,6 +752,21 @@ async function delItem(itemId, pedId){
   renderPedidos();
 }
 
+
+
+async function updItemForn(itemId, pedId, val){
+  const v=val.trim();
+  if(!v)return;
+  await supa.from('pedido_itens').update({fornecedor:v}).eq('id',itemId);
+  C.itens=C.itens.map(i=>i.id===itemId?{...i,fornecedor:v}:i);
+  // Atualizar também o título do pedido se todos os itens são do mesmo fornecedor
+  const itsPed=C.itens.filter(i=>i.pedido_id===pedId);
+  const forns=[...new Set(itsPed.map(i=>i.fornecedor).filter(Boolean))];
+  if(forns.length===1){
+    await supa.from('pedidos').update({titulo:forns[0]}).eq('id',pedId);
+    C.pedidos=C.pedidos.map(p=>p.id===pedId?{...p,titulo:forns[0]}:p);
+  }
+}
 
 async function updItemNome(itemId, val){
   const v=val.trim();
