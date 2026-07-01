@@ -393,16 +393,18 @@ async function init(){
 }
 
 async function reloadAll(){
-  const [a,b,c,d,e,f]=await Promise.all([
+  const [a,b,c,d,e,f,g]=await Promise.all([
     supa.from('restaurantes').select('*').order('nome'),
     supa.from('pedidos').select('*').order('created_at',{ascending:false}),
     supa.from('pedido_itens').select('*'),
     supa.from('produtos').select('*').order('nome'),
     supa.from('categorias').select('*').order('nome'),
-    supa.from('semanas').select('*').order('data_inicio',{ascending:false})
+    supa.from('semanas').select('*').order('data_inicio',{ascending:false}),
+    supa.from('historico_precos').select('*').order('registrado_em',{ascending:false})
   ]);
   C.restaurantes=a.data||[];C.pedidos=b.data||[];C.itens=c.data||[];
   C.produtos=d.data||[];C.categorias=e.data||[];C.semanas=f.data||[];
+  C.historico_precos=g.data||[];
   if(!restAtivo&&C.restaurantes.length)restAtivo=C.restaurantes[0].id;
 }
 
@@ -1123,21 +1125,45 @@ function toggleProd(id,nome,un){
   else ncSel[id]={nome,unidade:un,qty:'',valor:'',categoria:ncCat};
   renderNpSel();
 }
+function ultimoPreco(nomeProd){
+  // Buscar no histórico de preços o registro mais recente para este produto
+  const hist=C.historico_precos||[];
+  const registros=hist.filter(h=>h.produto_nome===nomeProd).sort((a,b)=>new Date(b.registrado_em)-new Date(a.registrado_em));
+  return registros[0]||null;
+}
+
 function renderNpSel(){
   const ids=Object.keys(ncSel);
   const el=document.getElementById('np-sel');
   if(!ids.length){el.innerHTML='';return}
-  el.innerHTML=`<div class="sep"></div>
-    <div class="slbl">Itens selecionados (${ids.length})</div>
-    <div style="overflow-x:auto"><table>
-      <thead><tr><th>Produto</th><th>Qtd</th><th>Valor unit. (R$)</th><th></th></tr></thead>
-      <tbody>${ids.map(id=>{const p=ncSel[id];return`<tr>
-        <td style="font-size:12px">${p.nome} <span style="color:var(--ar-dim)">${p.unidade}</span></td>
-        <td><input type="number" min="0" step="0.5" value="${p.qty}" onchange="updP('${id}','qty',this.value)" style="width:70px;padding:4px 8px;font-size:12px"></td>
-        <td><input type="number" min="0" step="0.01" value="${p.valor}" onchange="updP('${id}','valor',this.value)" style="width:90px;padding:4px 8px;font-size:12px" placeholder="0.00"></td>
-        <td><span style="cursor:pointer;color:var(--ar-red)" onclick="remP('${id}')">&#x2715;</span></td>
-      </tr>`}).join('')}</tbody>
-    </table></div>`;
+  el.innerHTML='<div class="sep"></div>'
+    +'<div class="slbl">Itens selecionados ('+ids.length+')</div>'
+    +'<div style="overflow-x:auto"><table>'
+    +'<thead><tr><th>Produto</th><th>Qtd</th><th>Valor unit. (R$)</th><th></th></tr></thead>'
+    +'<tbody>'+ids.map(id=>{
+      const p=ncSel[id];
+      const hist=ultimoPreco(p.nome);
+      let histHtml='';
+      if(hist){
+        const data=new Date(hist.registrado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+        histHtml='<div style="display:flex;align-items:center;gap:4px;margin-top:3px">'
+          +'<i class="ti ti-clock" style="font-size:11px;color:var(--c-accent)"></i>'
+          +'<span style="font-size:11px;color:var(--c-accent);font-weight:600">Último: '+fmtNum(hist.valor_unit)+'</span>'
+          +'<span style="font-size:10px;color:var(--c-dim)">· '+hist.fornecedor+' · '+data+'</span>'
+          +'</div>';
+      } else {
+        histHtml='<div style="display:flex;align-items:center;gap:4px;margin-top:3px">'
+          +'<i class="ti ti-clock-off" style="font-size:11px;color:var(--c-dim2)"></i>'
+          +'<span style="font-size:11px;color:var(--c-dim2)">Sem histórico</span>'
+          +'</div>';
+      }
+      return '<tr>'
+        +'<td style="font-size:12px">'+p.nome+' <span style="color:var(--c-dim)">'+p.unidade+'</span></td>'
+        +'<td><input type="number" min="0" step="0.5" value="'+p.qty+'" onchange="updNpQty(this,\''+id+'\')" style="width:70px;padding:4px 8px;font-size:12px"></td>'
+        +'<td><div><input type="number" min="0" step="0.01" value="'+p.valor+'" onchange="updNpValor(this,\''+id+'\')" style="width:100px;padding:4px 8px;font-size:12px" placeholder="0.00">'+histHtml+'</div></td>'
+        +'<td><span style="cursor:pointer;color:var(--c-red)" onclick="remNp(\''+id+'\')">&#x2715;</span></td>'
+        +'</tr>';
+    }).join('')+'</tbody></table></div>';
 }
 function updP(id,f,v){if(ncSel[id])ncSel[id][f]=v}
 function remP(id){
