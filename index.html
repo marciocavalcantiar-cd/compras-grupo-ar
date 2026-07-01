@@ -463,18 +463,29 @@ function renderMesesGrid(el){
     if(isPed){porMes[k].total+=total;porMes[k].peds++;}
   }
 
-  // Incluir TODAS as semanas (mesmo sem pedidos)
+  // Incluir TODAS as semanas — semana cai no mês onde tem mais dias
   C.semanas.forEach(s=>{
     if(!s.data_inicio)return;
     const di=new Date(s.data_inicio+'T12:00');
-    addMes(di.getMonth()+1, di.getFullYear(), s.id);
-    // Se a semana cruza para outro mês, adicionar lá também
-    if(s.data_fim){
-      const df=new Date(s.data_fim+'T12:00');
-      if(df.getMonth()!==di.getMonth()||df.getFullYear()!==di.getFullYear()){
-        addMes(df.getMonth()+1, df.getFullYear(), s.id);
-      }
+    if(!s.data_fim){
+      addMes(di.getMonth()+1, di.getFullYear(), s.id);
+      return;
     }
+    const df=new Date(s.data_fim+'T12:00');
+    // Contar dias em cada mês
+    let cur=new Date(di);
+    const diasPorMes={};
+    while(cur<=df){
+      const k=cur.getFullYear()+'-'+(cur.getMonth()+1);
+      diasPorMes[k]=(diasPorMes[k]||0)+1;
+      cur.setDate(cur.getDate()+1);
+    }
+    // Mês dominante = com mais dias
+    let maxDias=0, mesDom=null, anoDom=null;
+    Object.entries(diasPorMes).forEach(([k,d])=>{
+      if(d>maxDias){maxDias=d;[anoDom,mesDom]=k.split('-').map(Number);}
+    });
+    addMes(mesDom, anoDom, s.id);
   });
 
   // Adicionar totais dos pedidos
@@ -543,16 +554,28 @@ function renderSemanasDoMes(el, mes, ano){
     return d.getMonth()+1===mes&&d.getFullYear()===ano;
   });
 
-  // Semanas deste mês (com ou sem pedidos)
-  const sems=C.semanas.filter(s=>{
-    if(!s.data_inicio)return false;
+  // Semanas deste mês — só as que têm mês dominante = este mês
+  function mesDominante(s){
+    if(!s.data_inicio)return null;
     const di=new Date(s.data_inicio+'T12:00');
-    if(di.getMonth()+1===mes&&di.getFullYear()===ano)return true;
-    if(s.data_fim){
-      const df=new Date(s.data_fim+'T12:00');
-      if(df.getMonth()+1===mes&&df.getFullYear()===ano)return true;
+    if(!s.data_fim)return{mes:di.getMonth()+1,ano:di.getFullYear()};
+    const df=new Date(s.data_fim+'T12:00');
+    let cur=new Date(di);
+    const diasPorMes={};
+    while(cur<=df){
+      const k=cur.getFullYear()+'-'+(cur.getMonth()+1);
+      diasPorMes[k]=(diasPorMes[k]||0)+1;
+      cur.setDate(cur.getDate()+1);
     }
-    return false;
+    let maxDias=0,mesDom=null,anoDom=null;
+    Object.entries(diasPorMes).forEach(([k,d])=>{
+      if(d>maxDias){maxDias=d;[anoDom,mesDom]=k.split('-').map(Number);}
+    });
+    return{mes:mesDom,ano:anoDom};
+  }
+  const sems=C.semanas.filter(s=>{
+    const md=mesDominante(s);
+    return md&&md.mes===mes&&md.ano===ano;
   });
 
   const totalMes=peds.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
@@ -886,10 +909,18 @@ async function criarSemana(){
   toast('Semana criada!');closeModal();await reloadAll();renderPedidos();
 }
 async function delSemana(id){
-  if(!confirm('Remover semana? Os pedidos não serão removidos.'))return;
+  const sem=C.semanas.find(s=>s.id===id);
+  const pedsSem=C.pedidos.filter(p=>p.semana_id===id);
+  let msg='Remover a semana "'+( sem?.nome||'')+'"?';
+  if(pedsSem.length>0){
+    msg+='\n\n⚠️ ATENÇÃO: Esta semana tem '+pedsSem.length+' pedido(s) vinculado(s).\nSe remover, os pedidos ficarão sem semana e sumirão da tela.\n\nTem certeza que deseja continuar?';
+  }
+  if(!confirm(msg))return;
   await supa.from('semanas').delete().eq('id',id);
   C.semanas=C.semanas.filter(s=>s.id!==id);
-  toast('Semana removida');renderPedidos();
+  toast('Semana removida');
+  mesSelecionado=null;
+  renderPedidos();
 }
 
 // ── NOVO PEDIDO ──────────────────────────────────────
