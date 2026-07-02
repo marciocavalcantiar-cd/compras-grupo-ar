@@ -367,6 +367,7 @@ function verificarAuth(){
   if(sessionStorage.getItem('ar_auth')==='1'){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-layout').style.display='flex';
+    init();
     return true;
   }
   // Setar logo na tela de login
