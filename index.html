@@ -379,7 +379,13 @@ function verificarAuth(){
 async function init(){
   document.getElementById("logo-img").src=logo_data;
   await reloadAll();
-  if(C.restaurantes.length&&!restAtivo)restAtivo=C.restaurantes[0].id;
+  // Restaurar restaurante ativo da sessão anterior
+  const savedRest=sessionStorage.getItem('ar_rest_ativo');
+  if(savedRest&&C.restaurantes.find(r=>r.id===savedRest)){
+    restAtivo=savedRest;
+  } else if(C.restaurantes.length&&!restAtivo){
+    restAtivo=C.restaurantes[0].id;
+  }
   renderRestTabs();renderPedidos();
   // Auto-sync a cada 60 segundos
   setInterval(async()=>{
@@ -435,7 +441,7 @@ function renderRestTabs(){
     return `<button class="rest-tab${ativo?' active':''}" onclick="setRest('${r.id}')" style="${style}">${r.nome}</button>`;
   }).join('');
 }
-function setRest(id){restAtivo=id;renderRestTabs();renderPedidos();}
+function setRest(id){restAtivo=id;sessionStorage.setItem('ar_rest_ativo',id);renderRestTabs();renderPedidos();}
 
 function fmtD(d){if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;}
 
