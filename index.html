@@ -629,6 +629,7 @@ function renderSemanasDoMes(el, mes, ano){
   let semsHtml='';
   sems.sort((a,b)=>(a.data_inicio||'').localeCompare(b.data_inicio||'')).forEach(s=>{
     const pSem=pedsDoRest.filter(p=>p.semana_id===s.id);
+    console.log('Semana:',s.nome,'pedsDoRest:',pedsDoRest.length,'pSem:',pSem.length,'restAtivo:',restAtivo);
     const totalSem=pSem.reduce((t,p)=>t+(parseFloat(p.total)||0),0);
     const entregues=pSem.filter(p=>p.status==='Entregue').length;
     const pct=pSem.length?Math.round(entregues/pSem.length*100):0;
