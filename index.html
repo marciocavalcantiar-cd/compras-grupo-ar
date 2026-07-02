@@ -2289,7 +2289,7 @@ function _gerarRelatorioProvisorio(semFiltro, restFiltro){
   html+='.chip-pr{background:#FEF0E0;color:#B86010}';
   html+='.chip-ag{background:#F0F1F5;color:#6B7080}';
   html+='.footer{margin-top:28px;padding-top:14px;border-top:1px solid #E8E9EF;display:flex;justify-content:space-between;font-size:10px;color:#9DA3B4}';
-  html+='@media print{body{background:#fff;font-size:10.5px}.page{padding:10px}.no-print{display:none}@page{margin:5mm;size:A4}.rest-section{page-break-inside:avoid;margin-bottom:8px}.rest-header{padding:6px 12px}.rst{padding:6px 10px}.rst-l{font-size:9px;margin-bottom:2px}.rst-v{font-size:12px}th{padding:4px 8px!important;font-size:9px!important}td{padding:4px 8px!important;font-size:10px!important}.prog-wrap{padding:5px 10px}.footer{margin-top:10px;padding-top:8px}h1{font-size:14px}}';
+  html+='@media print{body{background:#fff;font-size:10.5px}.page{padding:10px}.no-print{display:none}@page{margin:10mm;size:A4}.rest-section{page-break-before:always;page-break-inside:avoid;margin-bottom:8px}.rest-section:first-of-type{page-break-before:avoid}.rest-header{padding:6px 12px}.rst{padding:6px 10px}.rst-l{font-size:9px;margin-bottom:2px}.rst-v{font-size:12px}th{padding:4px 8px!important;font-size:9px!important}td{padding:4px 8px!important;font-size:10px!important}.prog-wrap{padding:5px 10px}.footer{margin-top:10px;padding-top:8px}h1{font-size:14px}}';
   html+='</style></head><body>';
   html+='<div class="no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">';
   html+='<button onclick="window.print()" style="background:#1C1E2E;color:#fff;border:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">🖨 Imprimir</button>';
