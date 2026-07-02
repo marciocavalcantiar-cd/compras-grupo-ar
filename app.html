@@ -609,7 +609,8 @@ function renderSemanasDoMes(el, mes, ano){
     return md&&md.mes===mes&&md.ano===ano;
   });
 
-  const totalMes=peds.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
+  const pedsDoRest=C.pedidos.filter(p=>p.restaurante_id===restAtivo);
+  const totalMes=pedsDoRest.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
 
   let html='<button class="mes-back" onclick="voltarParaMeses()"><i class="ti ti-arrow-left"></i> '+mesesNomes[mes-1]+' '+ano+'</button>';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
@@ -627,7 +628,7 @@ function renderSemanasDoMes(el, mes, ano){
   const now=new Date();
   let semsHtml='';
   sems.sort((a,b)=>(a.data_inicio||'').localeCompare(b.data_inicio||'')).forEach(s=>{
-    const pSem=peds.filter(p=>p.semana_id===s.id);
+    const pSem=pedsDoRest.filter(p=>p.semana_id===s.id);
     const totalSem=pSem.reduce((t,p)=>t+(parseFloat(p.total)||0),0);
     const entregues=pSem.filter(p=>p.status==='Entregue').length;
     const pct=pSem.length?Math.round(entregues/pSem.length*100):0;
