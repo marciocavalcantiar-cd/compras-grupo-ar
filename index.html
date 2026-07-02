@@ -554,6 +554,26 @@ function voltarParaMeses(){
   renderPedidos();
 }
 
+function mesDominante(s){
+  if(!s.data_inicio)return null;
+  const di=new Date(s.data_inicio+'T12:00');
+  if(!s.data_fim)return{mes:di.getMonth()+1,ano:di.getFullYear()};
+  const df=new Date(s.data_fim+'T12:00');
+  let cur=new Date(di);
+  const diasPorMes={};
+  while(cur<=df){
+    const k=cur.getFullYear()+'-'+(cur.getMonth()+1);
+    diasPorMes[k]=(diasPorMes[k]||0)+1;
+    cur.setDate(cur.getDate()+1);
+  }
+  let maxDias=0,mesDom=null,anoDom=null;
+  Object.entries(diasPorMes).forEach(([k,d])=>{
+    if(d>maxDias){maxDias=d;[anoDom,mesDom]=k.split('-').map(Number);}
+  });
+  return{mes:mesDom,ano:anoDom};
+}
+
+
 function renderSemanasDoMes(el, mes, ano){
   const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const peds=C.pedidos.filter(p=>{
@@ -564,7 +584,8 @@ function renderSemanasDoMes(el, mes, ano){
   });
 
   // Semanas deste mês — só as que têm mês dominante = este mês
-  function mesDominante(s){
+  // mesDominante movida para escopo global
+  function _mesDom(s){
     if(!s.data_inicio)return null;
     const di=new Date(s.data_inicio+'T12:00');
     if(!s.data_fim)return{mes:di.getMonth()+1,ano:di.getFullYear()};
@@ -583,7 +604,7 @@ function renderSemanasDoMes(el, mes, ano){
     return{mes:mesDom,ano:anoDom};
   }
   const sems=C.semanas.filter(s=>{
-    const md=mesDominante(s);
+    const md=_mesDom(s);
     return md&&md.mes===mes&&md.ano===ano;
   });
 
