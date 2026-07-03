@@ -238,6 +238,9 @@
       <button class="sb-item" onclick="openNovaSemana()" title="Nova semana">
         <i class="ti ti-calendar-plus"></i><span>Nova semana</span>
       </button>
+      <button class="sb-item" onclick="showPageLimpeza()" title="Material de Limpeza">
+        <i class="ti ti-droplet"></i><span>Material de Limpeza</span>
+      </button>
       <button class="sb-item" onclick="abrirRelatorioFinanceiro()" title="Relatório Financeiro">
         <i class="ti ti-table"></i><span>Rel. Financeiro</span>
       </button>
@@ -284,7 +287,14 @@
     </div>
 
     <!-- HISTÓRICO DE PREÇOS -->
-    <div id="page-precos" class="page">
+    <div id="page-limpeza" class="page">
+    <div class="page-header">
+      <div class="page-title">Material de Limpeza</div>
+      <div class="page-sub">CD — Cozinha de Produção</div>
+    </div>
+    <div id="area-limpeza"></div>
+  </div>
+  <div id="page-precos" class="page">
       <div class="page-header">
         <div class="page-title">Histórico de Preços</div>
       </div>
@@ -310,7 +320,7 @@ const supa=supabase.createClient(SUPA_URL,SUPA_KEY);
 const SL=['Aguardando','Previsto','Entregue'];
 const SC={'Aguardando':'ib-ag','Previsto':'ib-pr','Entregue':'ib-en'};
 const NS={'Aguardando':'Previsto','Previsto':'Entregue','Entregue':'Aguardando'};
-let C={restaurantes:[],pedidos:[],itens:[],produtos:[],categorias:[],semanas:[],historico_precos:[]};
+let C={restaurantes:[],pedidos:[],itens:[],produtos:[],categorias:[],semanas:[],historico_precos:[],produtos_limpeza:[],categorias_limpeza:[],pedidos_limpeza:[],itens_limpeza:[]};
 let restAtivo=null,ncCat='',ncSel={},pedSemId=null;
 let mesSelecionado=null;
 const semsAbertas=new Set();
@@ -414,6 +424,17 @@ async function reloadAll(){
   C.produtos=d.data||[];C.categorias=e.data||[];C.semanas=f.data||[];
   C.historico_precos=g.data||[];
   if(!restAtivo&&C.restaurantes.length)restAtivo=C.restaurantes[0].id;
+  // Carregar dados de limpeza em paralelo
+  const [h1,h2,h3,h4]=await Promise.all([
+    supa.from('produtos_limpeza').select('*').order('categoria').order('nome'),
+    supa.from('categorias_limpeza').select('*').order('nome'),
+    supa.from('pedidos_limpeza').select('*').order('created_at',{ascending:false}),
+    supa.from('itens_limpeza').select('*')
+  ]);
+  C.produtos_limpeza=h1.data||[];
+  C.categorias_limpeza=h2.data||[];
+  C.pedidos_limpeza=h3.data||[];
+  C.itens_limpeza=h4.data||[];
 }
 
 async function refreshDados(){
@@ -2391,6 +2412,399 @@ function _gerarRelatorioProvisorio(semFiltro, restFiltro){
   abrirEspelhoModal(html,'Relatório de Compras ('+dataArquivo()+')');
 }
 
+
+
+// ── MATERIAL DE LIMPEZA ──────────────────────────────
+let limSemSel=null; // semana selecionada na aba de limpeza
+let limCatSel=''; // categoria selecionada no modal
+
+function showPageLimpeza(){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-limpeza').classList.add('active');
+  event.currentTarget.classList.add('active');
+  renderLimpeza();
+}
+
+async function renderLimpeza(){
+  const el=document.getElementById('area-limpeza');
+  if(!el)return;
+
+  if(!limSemSel){
+    renderLimpezaMeses(el);
+  } else {
+    renderLimpezaSemana(el);
+  }
+}
+
+
+function abrirLimMes(el){
+  const k=el.getAttribute('data-meskey');
+  document.getElementById('area-limpeza').dataset.meskey=k;
+  renderLimpezaSemana2(k);
+}
+
+function renderLimpezaMeses(el){
+  const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Agrupar por mês dominante
+  const porMes={};
+  C.semanas.forEach(s=>{
+    const md=mesDominante(s);
+    if(!md)return;
+    const k=md.ano+'-'+String(md.mes).padStart(2,'0');
+    if(!porMes[k])porMes[k]={mes:md.mes,ano:md.ano,semanas:[],total:0,qtdPeds:0};
+    porMes[k].semanas.push(s);
+    // Calcular totais dos pedidos de limpeza nessa semana
+    const peds=C.pedidos_limpeza.filter(p=>p.semana_id===s.id);
+    porMes[k].qtdPeds+=peds.length;
+    porMes[k].total+=peds.reduce((sum,p)=>sum+(parseFloat(p.total)||0),0);
+  });
+
+  const keys=Object.keys(porMes).sort((a,b)=>b.localeCompare(a));
+
+  let html='';
+
+  if(!keys.length){
+    html='<div class="empty"><i class="ti ti-droplet-off"></i>Nenhuma semana cadastrada ainda.</div>';
+    el.innerHTML=html;
+    return;
+  }
+
+  html+='<div class="meses-grid">';
+  keys.forEach(k=>{
+    const m=porMes[k];
+    html+='<div class="mes-card" onclick="abrirLimMes(this)" data-meskey="'+k+'">';
+    html+='<div class="mes-card-nome">'+mesesNomes[m.mes-1]+' '+m.ano+'</div>';
+    html+='<div class="mes-card-sub">'+m.semanas.length+' semana(s) · '+m.qtdPeds+' pedido(s)</div>';
+    html+='<div class="mes-card-total">'+(m.total>0?fmtNum(m.total):'R$ 0,00')+'</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function renderLimpezaSemana2(mesKey){
+  const el=document.getElementById('area-limpeza');
+  if(!el)return;
+  el.dataset.meskey=mesKey;
+  const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const [ano,mes]=[parseInt(mesKey.split('-')[0]),parseInt(mesKey.split('-')[1])];
+
+  const sems=C.semanas.filter(s=>{
+    const md=mesDominante(s);
+    return md&&md.mes===mes&&md.ano===ano;
+  }).sort((a,b)=>(a.data_inicio||'').localeCompare(b.data_inicio||''));
+
+  const fmtD2=d=>{if(!d)return'';const[y,m2,day]=d.split('-');return day+'/'+m2;};
+
+  let html='<button class="mes-back" onclick="limSemSel=null;document.getElementById(\'area-limpeza\').dataset.meskey=\'\';renderLimpezaMeses(document.getElementById(\'area-limpeza\'))"><i class="ti ti-arrow-left"></i> '+mesesNomes[mes-1]+' '+ano+'</button>';
+
+  sems.forEach(s=>{
+    const peds=C.pedidos_limpeza.filter(p=>p.semana_id===s.id);
+    const totalSem=peds.reduce((sum,p)=>sum+(parseFloat(p.total)||0),0);
+    const itens=peds.flatMap(p=>C.itens_limpeza.filter(i=>i.pedido_id===p.id));
+    const entregues=itens.filter(i=>i.status==='Entregue').length;
+    const pct=itens.length?Math.round(entregues/itens.length*100):0;
+
+    const semId=s.id;
+    html+='<div class="semana-card semana-collapsed" id="limsem-'+semId+'">';
+    html+='<div class="semana-head" id="limhead-'+semId+'">';
+    html+='<i class="ti ti-chevron-right" id="iclim-'+semId+'" style="color:var(--c-dim);font-size:14px"></i>';
+    html+='<div style="flex:1;min-width:0">';
+    html+='<div style="font-size:15px;font-weight:500;color:var(--c-text)">'+s.nome+'</div>';
+    html+='<div style="font-size:12px;color:var(--c-dim);margin-top:2px">';
+    html+=fmtD2(s.data_inicio)+' a '+fmtD2(s.data_fim)+' · '+peds.length+' pedido(s) · '+fmtNum(totalSem)+' · '+pct+'% entregue';
+    html+='</div></div>';
+    html+='<div style="display:flex;gap:6px;align-items:center" id="limbtn-'+semId+'">';
+    html+='<button class="btn btn-sm btn-acc" style="font-size:12px"><i class="ti ti-plus"></i> Pedido</button>';
+    html+='</div></div>';
+
+    html+='<div class="semana-body" id="limbody-'+semId+'">';
+    if(!peds.length){
+      html+='<div style="font-size:13px;color:var(--c-dim);padding:12px 16px">Nenhum pedido. Clique em "+ Pedido" para adicionar.</div>';
+    } else {
+      const forns=[...new Set(peds.map(p=>p.fornecedor))].sort();
+      html+='<div class="tbl-outer"><table class="ped-table"><thead><tr>';
+      html+='<th>Categoria</th><th>Produto</th><th style="text-align:center">Med.</th>';
+      html+='<th class="r">Qtd.</th><th class="r">Valor unit.</th><th class="r">Total</th><th style="text-align:center">Status</th><th></th>';
+      html+='</tr></thead><tbody>';
+
+      forns.forEach(forn=>{
+        const pedsForn=peds.filter(p=>p.fornecedor===forn);
+        const itensForn=pedsForn.flatMap(p=>C.itens_limpeza.filter(i=>i.pedido_id===p.id));
+        const totalForn=itensForn.reduce((sum,i)=>sum+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+        html+='<tr class="sep-row"><td colspan="8">'+forn+' — '+fmtNum(totalForn)+'</td></tr>';
+
+        itensForn.forEach(it=>{
+          const sub=(parseFloat(it.valor_unit)||0)*(parseFloat(it.quantidade)||0);
+          const chipCls=it.status==='Entregue'?'ib-en':it.status==='Previsto'?'ib-pr':'ib-ag';
+          const pedId=pedsForn[0]?.id||'';
+          html+='<tr data-itemid="'+it.id+'" data-pedid="'+pedId+'" class="lim-item-row">';
+          html+='<td class="cat">'+(it.categoria||'—')+'</td>';
+          html+='<td><input type="text" value="'+it.produto.replace(/"/g,'&quot;')+ '" class="lim-nome-inp" style="width:100%;padding:2px 4px;font-size:13px;background:transparent;border:none;border-bottom:1px solid transparent;font-family:inherit"></td>';
+          html+='<td style="text-align:center">'+(it.unidade||'UN')+'</td>';
+          html+='<td class="r"><input type="number" min="0" step="0.01" value="'+(it.quantidade||'')+'" class="lim-qty-inp" style="width:65px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--c-border2);font-family:inherit"></td>';
+          html+='<td class="r"><input type="number" min="0" step="0.01" value="'+(it.valor_unit||'')+'" class="lim-val-inp" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--c-border2);font-family:inherit"></td>';
+          html+='<td class="r" style="font-weight:500">'+(sub>0?fmtNum(sub):'—')+'</td>';
+          html+='<td style="text-align:center"><span class="ibadge lim-status-badge '+chipCls+'">'+(it.status||'Aguardando')+'</span></td>';
+          html+='<td><button class="btn-del btn btn-xs lim-del-btn"><i class="ti ti-trash"></i></button></td>';
+          html+='</tr>';
+        });
+      });
+
+      html+='<tr class="total-row"><td colspan="5" style="text-align:right;color:var(--c-dim);font-size:12px">Total da semana</td>';
+      html+='<td class="r" style="font-weight:700;font-size:14px">'+fmtNum(totalSem)+'</td><td colspan="2"></td></tr>';
+      html+='</tbody></table></div>';
+    }
+    html+='</div></div>';
+  });
+
+  el.innerHTML=html;
+
+  // Event delegation — adicionar eventos após renderizar
+  sems.forEach(s=>{
+    const semId=s.id;
+    // Toggle semana
+    const head=document.getElementById('limhead-'+semId);
+    if(head)head.addEventListener('click',()=>toggleLimSem(semId));
+    // Botão novo pedido
+    const btn=document.querySelector('#limbtn-'+semId+' button');
+    if(btn)btn.addEventListener('click',(e)=>{e.stopPropagation();limSel={};openNovoPedidoLimpeza(semId);});
+    // Inputs e badges nos itens
+    document.querySelectorAll('#limbody-'+semId+' .lim-item-row').forEach(row=>{
+      const itemId=row.dataset.itemid;
+      const pedId=row.dataset.pedid;
+      const nomeInp=row.querySelector('.lim-nome-inp');
+      const qtyInp=row.querySelector('.lim-qty-inp');
+      const valInp=row.querySelector('.lim-val-inp');
+      const badge=row.querySelector('.lim-status-badge');
+      const delBtn=row.querySelector('.lim-del-btn');
+      if(nomeInp)nomeInp.addEventListener('change',()=>updLimItemNome(itemId,nomeInp.value));
+      if(qtyInp)qtyInp.addEventListener('change',()=>updLimItemQty(itemId,pedId,qtyInp.value));
+      if(valInp)valInp.addEventListener('change',()=>updLimItemValor(itemId,pedId,valInp.value));
+      if(badge)badge.addEventListener('click',()=>cicleLimStatus(itemId,pedId));
+      if(delBtn)delBtn.addEventListener('click',()=>delLimItem(itemId,pedId));
+    });
+  });
+}
+
+
+function renderLimpeza(){
+  const el=document.getElementById('area-limpeza');
+  if(!el)return;
+  if(!limSemSel){
+    renderLimpezaMeses(el);
+  }
+}
+
+function toggleLimSem(id){
+  const el=document.getElementById('limsem-'+id);
+  const ic=document.getElementById('iclim-'+id);
+  if(!el)return;
+  el.classList.toggle('semana-collapsed');
+  if(ic){ic.className=el.classList.contains('semana-collapsed')?'ti ti-chevron-right':'ti ti-chevron-down';ic.style.cssText='color:var(--c-dim);font-size:14px';}
+}
+
+function openNovoPedidoLimpeza(semId){
+  const sem=C.semanas.find(s=>s.id===semId);
+  const cats=C.categorias_limpeza;
+  limCatSel=cats[0]?.nome||'';
+
+  const catsHtml=cats.map((c,idx)=>'<button class="cat-pill lim-cat-btn'+(c.nome===limCatSel?' active':'')+' " data-catidx="'+idx+'">'+c.nome+'</button>').join('');
+
+  showModal(
+    '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:4px"><i class="ti ti-droplet" style="color:var(--c-accent)"></i> Novo Pedido de Limpeza</div>'
+    +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:14px">'+(sem?.nome||'')+'</div>'
+    +'<div class="grid2f" style="margin-bottom:12px">'
+    +'<div class="field"><label>Fornecedor</label><input id="lim-forn" type="text" placeholder="Ex: Amplamax"></div>'
+    +'<div class="field"><label>Data</label><input id="lim-data" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:8px"><div class="slbl" style="margin-bottom:6px">Categoria</div>'
+    +'<div class="g8" id="lim-cats">'+catsHtml+'</div></div>'
+    +'<div class="field" style="margin-bottom:8px"><label>Buscar produto</label>'
+    +'<input id="lim-search" type="text" placeholder="Digite para filtrar..." oninput="filtrarLimProd()"></div>'
+    +'<div class="prod-list" id="lim-list"></div>'
+    +'<div id="lim-sel" style="margin-top:12px"></div>'
+    +'<div class="g8" style="justify-content:flex-end;margin-top:14px">'
+    +'<button class="btn btn-acc" id="lim-criar-btn"><i class="ti ti-check"></i> Criar pedido</button>'
+    +'<button class="btn btn-acc" id="lim-criar-btn"><i class="ti ti-check"></i> Criar pedido</button>'
+    +'</div>'
+  );
+  filtrarLimProd();
+}
+
+let limSel={};
+function setLimCat(cat){
+  limCatSel=cat;
+  const cats=C.categorias_limpeza;
+  document.getElementById('lim-cats').innerHTML=cats.map((c,idx)=>'<button class="cat-pill lim-cat-btn'+(c.nome===limCatSel?' active':'')+' " data-catidx="'+idx+'">'+c.nome+'</button>').join('');
+  filtrarLimProd();
+}
+
+function filtrarLimProd(){
+  const q=(document.getElementById('lim-search')?.value||'').toLowerCase();
+  const lista=C.produtos_limpeza.filter(p=>p.categoria===limCatSel&&p.nome.toLowerCase().includes(q));
+  const el=document.getElementById('lim-list');
+  if(!el)return;
+  el.innerHTML=lista.length
+    ?lista.map(p=>'<div class="prod-row lim-prod-row" data-prodid="'+p.id+'">'
+      +'<input type="checkbox" '+(limSel[p.id]?'checked ':'')+' style="flex-shrink:0;accent-color:var(--c-accent);width:15px;height:15px" data-prodid="'+p.id+'" data-nome="'+p.nome.replace(/"/g,'&quot;')+'" data-un="'+p.unidade+'" class="lim-prod-chk">'
+      +'<span style="flex:1">'+p.nome+'</span>'
+      +'<span style="font-size:11px;color:var(--c-dim);background:var(--c-bg);padding:2px 6px;border-radius:4px">'+p.unidade+'</span>'
+      +'</div>').join('')
+    :'<div style="font-size:13px;color:var(--c-dim);padding:12px;text-align:center">Nenhum produto nesta categoria</div>';
+  renderLimSel();
+  // Event delegation para prod-rows
+  setTimeout(()=>{
+    document.querySelectorAll('.lim-prod-row').forEach(row=>{
+      row.addEventListener('click',()=>{
+        const chk=row.querySelector('.lim-prod-chk');
+        if(chk){
+          const id=chk.dataset.prodid;
+          const nome=chk.dataset.nome;
+          const un=chk.dataset.un;
+          toggleLimProd(id,nome,un);
+        }
+      });
+      const chk=row.querySelector('.lim-prod-chk');
+      if(chk)chk.addEventListener('click',e=>e.stopPropagation());
+    });
+  },50);
+}
+
+function toggleLimProd(id,nome,un){
+  if(limSel[id])delete limSel[id];
+  else limSel[id]={nome,unidade:un,categoria:limCatSel,qty:'',valor:''};
+  filtrarLimProd();
+}
+
+function renderLimSel(){
+  const ids=Object.keys(limSel);
+  const el=document.getElementById('lim-sel');
+  if(!el||!ids.length){if(el)el.innerHTML='';return;}
+  el.innerHTML='<hr style="margin:8px 0;border:none;border-top:1px solid var(--c-border)">'
+    +'<div class="slbl" style="margin-bottom:6px">Itens selecionados ('+ids.length+')</div>'
+    +'<table style="width:100%"><thead><tr><th>Produto</th><th>Qtd</th><th>Valor unit.</th><th></th></tr></thead><tbody>'
+    +ids.map(id=>{
+      const p=limSel[id];
+      return '<tr><td style="font-size:12px">'+p.nome+' <span style="color:var(--c-dim)">'+p.unidade+'</span></td>'
+      return '<tr class="lim-sel-row" data-selid="'+id+'"><td style="font-size:12px">'+p.nome+' <span style="color:var(--c-dim)">'+p.unidade+'</span></td>'
+        +'<td><input type="number" min="0" step="0.01" value="'+p.qty+'" class="lim-np-qty" style="width:65px;padding:4px;font-size:12px"></td>'
+        +'<td><input type="number" min="0" step="0.01" value="'+p.valor+'" class="lim-np-val" style="width:80px;padding:4px;font-size:12px" placeholder="0.00"></td>'
+        +'<td><button class="lim-rem-btn" style="cursor:pointer;color:var(--c-red);background:none;border:none;font-size:14px">✕</button></td>'
+    }).join('')+'</tbody></table>';
+  // Event delegation para itens selecionados
+  setTimeout(()=>{
+    document.querySelectorAll('.lim-sel-row').forEach(row=>{
+      const id=row.dataset.selid;
+      const qty=row.querySelector('.lim-np-qty');
+      const val=row.querySelector('.lim-np-val');
+      const rem=row.querySelector('.lim-rem-btn');
+      if(qty)qty.addEventListener('change',()=>updLimNpQty(qty,id));
+      if(val)val.addEventListener('change',()=>updLimNpValor(val,id));
+      if(rem)rem.addEventListener('click',()=>remLimP(id));
+    });
+    // Event delegation para categorias
+    document.querySelectorAll('.lim-cat-btn').forEach((btn,idx)=>{
+      btn.addEventListener('click',()=>{
+        const cat=C.categorias_limpeza[parseInt(btn.dataset.catidx)];
+        if(cat)setLimCat(cat.nome);
+      });
+    });
+    // Botão criar pedido
+    const criarBtn=document.getElementById('lim-criar-btn');
+    const semId=document.querySelector('[id^="limsem-"]')?.id?.replace('limsem-','');
+    if(criarBtn&&semId)criarBtn.addEventListener('click',()=>criarPedidoLimpeza(semId));
+  },50);
+}
+
+function updLimNpQty(el,id){if(limSel[id])limSel[id].qty=el.value;}
+function updLimNpValor(el,id){if(limSel[id])limSel[id].valor=el.value;}
+function remLimP(id){delete limSel[id];filtrarLimProd();}
+
+async function criarPedidoLimpeza(semId){
+  const forn=document.getElementById('lim-forn')?.value.trim();
+  const data=document.getElementById('lim-data')?.value;
+  const ids=Object.keys(limSel);
+  if(!forn){toast('Informe o fornecedor');return;}
+  if(!ids.length){toast('Selecione ao menos um produto');return;}
+
+  const total=ids.reduce((s,id)=>{const p=limSel[id];return s+(parseFloat(p.qty)||0)*(parseFloat(p.valor)||0);},0);
+
+  const {data:ped,error}=await supa.from('pedidos_limpeza').insert({
+    semana_id:semId,fornecedor:forn,data,status:'Aguardando',total
+  }).select().single();
+  if(error){toast('Erro ao criar pedido: '+error.message);return;}
+
+  await supa.from('itens_limpeza').insert(ids.map(id=>{
+    const p=limSel[id];
+    return{pedido_id:ped.id,produto:p.nome,categoria:p.categoria,unidade:p.unidade,
+      quantidade:parseFloat(p.qty)||null,valor_unit:parseFloat(p.valor)||null,
+      fornecedor:forn,status:'Aguardando'};
+  }));
+
+  limSel={};
+  toast('Pedido de limpeza criado!');
+  closeModal();
+  // Recarregar dados de limpeza
+  const [h3,h4]=await Promise.all([
+    supa.from('pedidos_limpeza').select('*').order('created_at',{ascending:false}),
+    supa.from('itens_limpeza').select('*')
+  ]);
+  C.pedidos_limpeza=h3.data||[];
+  C.itens_limpeza=h4.data||[];
+  const mesKey=document.getElementById('area-limpeza').dataset.meskey||'';
+  if(mesKey)renderLimpezaSemana2(mesKey);
+}
+
+async function updLimItemNome(id,val){
+  if(!val.trim())return;
+  await supa.from('itens_limpeza').update({produto:val}).eq('id',id);
+  C.itens_limpeza=C.itens_limpeza.map(i=>i.id===id?{...i,produto:val}:i);
+}
+
+async function updLimItemQty(itemId,pedId,val){
+  const v=parseFloat(val)||0;
+  await supa.from('itens_limpeza').update({quantidade:v}).eq('id',itemId);
+  C.itens_limpeza=C.itens_limpeza.map(i=>i.id===itemId?{...i,quantidade:v}:i);
+  await recalcLimTotal(pedId);
+}
+
+async function updLimItemValor(itemId,pedId,val){
+  const v=parseFloat(val)||0;
+  await supa.from('itens_limpeza').update({valor_unit:v}).eq('id',itemId);
+  C.itens_limpeza=C.itens_limpeza.map(i=>i.id===itemId?{...i,valor_unit:v}:i);
+  await recalcLimTotal(pedId);
+}
+
+async function recalcLimTotal(pedId){
+  const its=C.itens_limpeza.filter(i=>i.pedido_id===pedId);
+  const total=its.reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+  await supa.from('pedidos_limpeza').update({total}).eq('id',pedId);
+  C.pedidos_limpeza=C.pedidos_limpeza.map(p=>p.id===pedId?{...p,total}:p);
+}
+
+async function cicleLimStatus(itemId,pedId){
+  const it=C.itens_limpeza.find(i=>i.id===itemId);
+  if(!it)return;
+  const ciclo=['Aguardando','Previsto','Entregue'];
+  const next=ciclo[(ciclo.indexOf(it.status||'Aguardando')+1)%3];
+  await supa.from('itens_limpeza').update({status:next}).eq('id',itemId);
+  C.itens_limpeza=C.itens_limpeza.map(i=>i.id===itemId?{...i,status:next}:i);
+  // Recarregar a semana atual
+  const mesKey=document.getElementById('area-limpeza').dataset.meskey||'';
+  if(mesKey)renderLimpezaSemana2(mesKey);
+}
+
+async function delLimItem(itemId,pedId){
+  if(!confirm('Remover este item?'))return;
+  await supa.from('itens_limpeza').delete().eq('id',itemId);
+  C.itens_limpeza=C.itens_limpeza.filter(i=>i.id!==itemId);
+  await recalcLimTotal(pedId);
+  const mesKey=document.getElementById('area-limpeza').dataset.meskey||'';
+  if(mesKey)renderLimpezaSemana2(mesKey);
+}
 
 function showModal(html){document.getElementById('mbox').innerHTML=html;document.getElementById('overlay').classList.add('open')}
 function closeModal(){document.getElementById('overlay').classList.remove('open')}
