@@ -2447,42 +2447,52 @@ function abrirLimMes(el){
 function renderLimpezaMeses(el){
   const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  // Agrupar por mês dominante
+  // Agrupar por mês dominante — SÓ meses que têm pedidos de limpeza
   const porMes={};
-  C.semanas.forEach(s=>{
-    const md=mesDominante(s);
+  C.pedidos_limpeza.forEach(p=>{
+    if(!p.semana_id)return;
+    const sem=C.semanas.find(s=>s.id===p.semana_id);
+    if(!sem)return;
+    const md=mesDominante(sem);
     if(!md)return;
     const k=md.ano+'-'+String(md.mes).padStart(2,'0');
-    if(!porMes[k])porMes[k]={mes:md.mes,ano:md.ano,semanas:[],total:0,qtdPeds:0};
-    porMes[k].semanas.push(s);
-    // Calcular totais dos pedidos de limpeza nessa semana
-    const peds=C.pedidos_limpeza.filter(p=>p.semana_id===s.id);
-    porMes[k].qtdPeds+=peds.length;
-    porMes[k].total+=peds.reduce((sum,p)=>sum+(parseFloat(p.total)||0),0);
+    if(!porMes[k])porMes[k]={mes:md.mes,ano:md.ano,total:0,qtdPeds:0};
+    porMes[k].qtdPeds++;
+    porMes[k].total+=(parseFloat(p.total)||0);
   });
 
   const keys=Object.keys(porMes).sort((a,b)=>b.localeCompare(a));
 
-  let html='';
-
   if(!keys.length){
-    html='<div class="empty"><i class="ti ti-droplet-off"></i>Nenhuma semana cadastrada ainda.</div>';
-    el.innerHTML=html;
+    el.innerHTML='<div class="empty"><i class="ti ti-droplet-off"></i>Nenhum pedido de limpeza ainda.<br>Acesse uma semana e clique em "+ Pedido" para começar.</div>';
     return;
   }
 
-  html+='<div class="meses-grid">';
+  let html='<div class="meses-grid">';
   keys.forEach(k=>{
     const m=porMes[k];
     html+='<div class="mes-card" onclick="abrirLimMes(this)" data-meskey="'+k+'">';
     html+='<div class="mes-card-nome">'+mesesNomes[m.mes-1]+' '+m.ano+'</div>';
-    html+='<div class="mes-card-sub">'+m.semanas.length+' semana(s) · '+m.qtdPeds+' pedido(s)</div>';
-    html+='<div class="mes-card-total">'+(m.total>0?fmtNum(m.total):'R$ 0,00')+'</div>';
+    html+='<div class="mes-card-sub">'+m.qtdPeds+' pedido(s)</div>';
+    html+='<div class="mes-card-total">'+fmtNum(m.total)+'</div>';
     html+='</div>';
   });
   html+='</div>';
+
+  // Botão de acesso rápido para semana atual
+  const semAtual=C.semanas[0];
+  if(semAtual){
+    html+='<div style="margin-top:8px"><button class="btn btn-acc" id="lim-nova-btn" data-semid="'+semAtual.id+'"><i class="ti ti-plus"></i> Novo pedido — '+semAtual.nome+'</button></div>';
+  }
+
   el.innerHTML=html;
 }
+
+function abrirLimSemDireta(semId){
+  limSel={};
+  openNovoPedidoLimpeza(semId);
+}
+
 
 function renderLimpezaSemana2(mesKey){
   const el=document.getElementById('area-limpeza');
@@ -2618,7 +2628,7 @@ function openNovoPedidoLimpeza(semId){
     +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:14px">'+(sem?.nome||'')+'</div>'
     +'<div class="grid2f" style="margin-bottom:12px">'
     +'<div class="field"><label>Fornecedor</label><input id="lim-forn" type="text" placeholder="Ex: Amplamax"></div>'
-    +'<div class="field"><label>Data</label><input id="lim-data" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div>'
+    +'<div class="field"><label>Data da solicitação</label><input id="lim-data" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div>'
     +'</div>'
     +'<div style="margin-bottom:8px"><div class="slbl" style="margin-bottom:6px">Categoria</div>'
     +'<div class="g8" id="lim-cats">'+catsHtml+'</div></div>'
@@ -2696,6 +2706,14 @@ function renderLimSel(){
     }).join('')+'</tbody></table>';
   // Event delegation para itens selecionados
   setTimeout(()=>{
+    // Botão nova solicitação na tela inicial de limpeza
+    const novaBtn=document.getElementById('lim-nova-btn');
+    if(novaBtn){
+      novaBtn.addEventListener('click',()=>{
+        limSel={};
+        abrirLimSemDireta(novaBtn.dataset.semid);
+      });
+    }
     document.querySelectorAll('.lim-sel-row').forEach(row=>{
       const id=row.dataset.selid;
       const qty=row.querySelector('.lim-np-qty');
