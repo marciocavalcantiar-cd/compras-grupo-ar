@@ -2438,6 +2438,165 @@ async function renderLimpeza(){
 }
 
 
+
+async function fecharMesLimpeza(mes, ano){
+  const mesesNomes=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Buscar pedidos do mês
+  const pedsMes=C.pedidos_limpeza.filter(p=>{
+    const sem=C.semanas.find(s=>s.id===p.semana_id);
+    const md=sem?mesDominante(sem):null;
+    return md&&md.mes===mes&&md.ano===ano;
+  });
+
+  if(!pedsMes.length){toast('Nenhum pedido de limpeza neste mês');return;}
+
+  const total=pedsMes.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
+
+  // Preview por data de solicitação
+  const porData={};
+  pedsMes.forEach(p=>{
+    const d=p.data||'—';
+    if(!porData[d])porData[d]={total:0,qtd:0,fornecedores:[]};
+    porData[d].total+=(parseFloat(p.total)||0);
+    porData[d].qtd+=C.itens_limpeza.filter(i=>i.pedido_id===p.id).length;
+    if(!porData[d].fornecedores.includes(p.fornecedor))porData[d].fornecedores.push(p.fornecedor);
+  });
+
+  const linhas=Object.keys(porData).sort().map(d=>{
+    const info=porData[d];
+    const dataFmt=d!=='—'?new Date(d+'T12:00').toLocaleDateString('pt-BR'):'—';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--c-border);font-size:13px">'
+      +'<div><span style="font-weight:500">'+dataFmt+'</span>'
+      +'<span style="font-size:11px;color:var(--c-dim);margin-left:8px">'+info.fornecedores.join(', ')+'</span></div>'
+      +'<span style="font-weight:600;color:var(--c-accent)">'+fmtNum(info.total)+'</span>'
+      +'</div>';
+  }).join('');
+
+  showModal(
+    '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:4px;display:flex;align-items:center;gap:8px">'
+    +'<i class="ti ti-lock" style="color:var(--c-green);font-size:18px"></i> Fechar mês — Limpeza'
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:14px">'+mesesNomes[mes]+' '+ano+'</div>'
+    +'<div style="background:var(--c-bg);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;max-height:250px;overflow-y:auto">'
+    +linhas
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0">'
+    +'<span style="font-weight:700">Total do mês</span>'
+    +'<span style="font-weight:700;font-size:16px">'+fmtNum(total)+'</span>'
+    +'</div></div>'
+    +'<div class="g8" style="justify-content:flex-end">'
+    +'<button class="btn" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-acc" id="btn-confirmar-fechamento-lim"><i class="ti ti-lock"></i> Confirmar fechamento</button>'
+    +'</div>'
+  );
+
+  // Adicionar evento ao botão
+  setTimeout(()=>{
+    const btn=document.getElementById('btn-confirmar-fechamento-lim');
+    if(btn)btn.addEventListener('click',()=>confirmarFecharMesLimpeza(mes,ano,pedsMes));
+  },50);
+}
+
+async function confirmarFecharMesLimpeza(mes,ano,pedsMes){
+  closeModal();
+  toast('Salvando fechamento...',1500);
+
+  // Apagar registros anteriores deste mês
+  const {data:antigos}=await supa.from('fechamentos_limpeza').select('id').eq('mes',mes).eq('ano',ano);
+  if(antigos&&antigos.length){
+    await supa.from('fechamentos_limpeza').delete().eq('mes',mes).eq('ano',ano);
+  }
+
+  // Inserir um registro por pedido
+  const rows=pedsMes.map(p=>({
+    mes,ano,
+    data_solicitacao:p.data||new Date().toISOString().slice(0,10),
+    fornecedor:p.fornecedor,
+    total:parseFloat(p.total)||0,
+    qtd_itens:C.itens_limpeza.filter(i=>i.pedido_id===p.id).length,
+    pedido_id:p.id
+  }));
+
+  const {error}=await supa.from('fechamentos_limpeza').insert(rows);
+  if(error){toast('Erro: '+error.message);return;}
+  toast('Mês de limpeza fechado!');
+}
+
+async function renderRelatorioLimpeza(mes,ano){
+  const mesesNomes=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const el=document.getElementById('area-limpeza');
+  if(!el)return;
+
+  const {data:fechados,error}=await supa.from('fechamentos_limpeza')
+    .select('*').eq('mes',mes).eq('ano',ano).order('data_solicitacao');
+
+  if(error||!fechados||!fechados.length){
+    toast('Nenhum fechamento para '+mesesNomes[mes]+' '+ano);
+    return;
+  }
+
+  const totalMes=fechados.reduce((s,f)=>s+(parseFloat(f.total)||0),0);
+  const totalItens=fechados.reduce((s,f)=>s+(f.qtd_itens||0),0);
+
+  // Agrupar por data
+  const porData={};
+  fechados.forEach(f=>{
+    const d=f.data_solicitacao;
+    if(!porData[d])porData[d]={pedidos:[],total:0};
+    porData[d].pedidos.push(f);
+    porData[d].total+=(parseFloat(f.total)||0);
+  });
+
+  let html='<button class="mes-back" id="btn-back-lim-rel"><i class="ti ti-arrow-left"></i> '+mesesNomes[mes]+' '+ano+'</button>';
+  html+='<div class="card" style="margin-bottom:16px">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+  html+='<div><div style="font-size:18px;font-weight:700">'+mesesNomes[mes]+' '+ano+' — Limpeza</div>';
+  html+='<div style="font-size:12px;color:var(--c-dim);margin-top:2px">'+fechados.length+' pedidos · '+totalItens+' itens</div></div>';
+  html+='<div style="text-align:right"><div style="font-size:11px;color:var(--c-dim);text-transform:uppercase;font-weight:600">Total do mês</div>';
+  html+='<div style="font-size:22px;font-weight:700;color:var(--c-accent)">'+fmtNum(totalMes)+'</div></div>';
+  html+='</div>';
+
+  // Tabela por data
+  html+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
+  html+='<thead><tr style="background:var(--c-bg)">';
+  html+='<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--c-dim2);border-bottom:1.5px solid var(--c-border)">Data</th>';
+  html+='<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--c-dim2);border-bottom:1.5px solid var(--c-border)">Fornecedor</th>';
+  html+='<th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:600;color:var(--c-dim2);border-bottom:1.5px solid var(--c-border)">Itens</th>';
+  html+='<th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--c-dim2);border-bottom:1.5px solid var(--c-border)">Total</th>';
+  html+='</tr></thead><tbody>';
+
+  Object.keys(porData).sort().forEach((d,i)=>{
+    const info=porData[d];
+    const dataFmt=new Date(d+'T12:00').toLocaleDateString('pt-BR');
+    const bg=i%2?'#fff':'var(--c-bg)';
+
+    // Linha de data agrupada
+    html+='<tr style="background:#1A1A1C">';
+    html+='<td colspan="3" style="padding:6px 12px;font-size:11px;font-weight:600;color:#EF9F27;text-transform:uppercase;letter-spacing:0.05em">'+dataFmt+'</td>';
+    html+='<td style="padding:6px 12px;text-align:right;font-weight:700;color:#EF9F27">'+fmtNum(info.total)+'</td>';
+    html+='</tr>';
+
+    info.pedidos.forEach(f=>{
+      html+='<tr style="background:'+bg+'">';
+      html+='<td style="padding:8px 12px;border-bottom:1px solid var(--c-border)"></td>';
+      html+='<td style="padding:8px 12px;border-bottom:1px solid var(--c-border);font-weight:500">'+f.fornecedor+'</td>';
+      html+='<td style="padding:8px 12px;border-bottom:1px solid var(--c-border);text-align:center;color:var(--c-dim)">'+f.qtd_itens+'</td>';
+      html+='<td style="padding:8px 12px;border-bottom:1px solid var(--c-border);text-align:right;font-weight:600">'+fmtNum(f.total)+'</td>';
+      html+='</tr>';
+    });
+  });
+
+  // Total geral
+  html+='<tr style="background:var(--c-text)">';
+  html+='<td colspan="2" style="padding:10px 12px;font-weight:700;color:#EF9F27;font-size:12px;text-transform:uppercase">Total do mês</td>';
+  html+='<td style="padding:10px 12px;text-align:center;color:#fff;font-weight:600">'+totalItens+'</td>';
+  html+='<td style="padding:10px 12px;text-align:right;font-weight:700;color:#EF9F27;font-size:15px">'+fmtNum(totalMes)+'</td>';
+  html+='</tr>';
+  html+='</tbody></table></div>';
+
+  el.innerHTML=html;
+}
+
 function abrirLimMes(el){
   const k=el.getAttribute('data-meskey');
   document.getElementById('area-limpeza').dataset.meskey=k;
@@ -2508,7 +2667,12 @@ function renderLimpezaSemana2(mesKey){
 
   const fmtD2=d=>{if(!d)return'';const[y,m2,day]=d.split('-');return day+'/'+m2;};
 
-  let html='<button class="mes-back" onclick="limSemSel=null;document.getElementById(\'area-limpeza\').dataset.meskey=\'\';renderLimpezaMeses(document.getElementById(\'area-limpeza\'))"><i class="ti ti-arrow-left"></i> '+mesesNomes[mes-1]+' '+ano+'</button>';
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
+  html+='<button class="mes-back" onclick="limSemSel=null;document.getElementById(\'area-limpeza\').dataset.meskey=\'\';renderLimpezaMeses(document.getElementById(\'area-limpeza\'))"><i class="ti ti-arrow-left"></i> '+mesesNomes[mes-1]+' '+ano+'</button>';
+  html+='<div style="display:flex;gap:8px">';
+  html+='<button class="btn btn-sm" id="btn-rel-lim" data-mes="'+mes+'" data-ano="'+ano+'"><i class="ti ti-chart-bar"></i> Ver relatório</button>';
+  html+='<button class="btn btn-sm" id="btn-fechar-lim" data-mes="'+mes+'" data-ano="'+ano+'" style="color:var(--c-green);border-color:var(--c-green)"><i class="ti ti-lock"></i> Fechar mês</button>';
+  html+='</div></div>';
 
   sems.forEach(s=>{
     const peds=C.pedidos_limpeza.filter(p=>p.semana_id===s.id);
@@ -2571,6 +2735,18 @@ function renderLimpezaSemana2(mesKey){
   });
 
   el.innerHTML=html;
+
+  // Botões de fechar mês e ver relatório
+  setTimeout(()=>{
+    const btnFechar=document.getElementById('btn-fechar-lim');
+    if(btnFechar)btnFechar.addEventListener('click',()=>{
+      fecharMesLimpeza(parseInt(btnFechar.dataset.mes),parseInt(btnFechar.dataset.ano));
+    });
+    const btnRel=document.getElementById('btn-rel-lim');
+    if(btnRel)btnRel.addEventListener('click',()=>{
+      renderRelatorioLimpeza(parseInt(btnRel.dataset.mes),parseInt(btnRel.dataset.ano));
+    });
+  },50);
 
   // Event delegation — adicionar eventos após renderizar
   sems.forEach(s=>{
