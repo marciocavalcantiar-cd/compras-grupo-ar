@@ -2690,7 +2690,7 @@ function renderLimpezaMeses(el){
   html+='<div class="meses-grid">';
   keys.forEach(k=>{
     const m=porMes[k];
-    html+='<div class="mes-card" onclick="abrirLimMes(this)" data-meskey="'+k+'">';
+    html+='<div class="mes-card lim-mes-card" data-meskey="'+k+'">';
     html+='<div class="mes-card-nome">'+mesesNomes[m.mes-1]+' '+m.ano+'</div>';
     html+='<div class="mes-card-sub">'+(m.qtdPeds>0?m.qtdPeds+' pedido(s)':'Sem pedidos')+'</div>';
     html+='<div class="mes-card-total">'+(m.total>0?fmtNum(m.total):'—')+'</div>';
@@ -2700,11 +2700,16 @@ function renderLimpezaMeses(el){
 
   el.innerHTML=html;
   setTimeout(()=>{
+    // Botão nova semana
     const btn=document.getElementById('btn-lim-nova-semana');
     if(btn)btn.addEventListener('click',()=>openNovaLimSemana());
-    // Botão de novo pedido rápido na semana mais recente
-    const lim_nova=document.getElementById('lim-nova-btn');
-    if(lim_nova)lim_nova.addEventListener('click',()=>{limSel={};abrirLimSemDireta(lim_nova.dataset.semid);});
+    // Cards de mês
+    document.querySelectorAll('.lim-mes-card').forEach(card=>{
+      card.addEventListener('click',()=>{
+        el.dataset.meskey=card.dataset.meskey;
+        renderLimpezaSemana2(card.dataset.meskey);
+      });
+    });
   },50);
 }
 
