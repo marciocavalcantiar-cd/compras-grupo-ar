@@ -320,7 +320,7 @@ const supa=supabase.createClient(SUPA_URL,SUPA_KEY);
 const SL=['Aguardando','Previsto','Entregue'];
 const SC={'Aguardando':'ib-ag','Previsto':'ib-pr','Entregue':'ib-en'};
 const NS={'Aguardando':'Previsto','Previsto':'Entregue','Entregue':'Aguardando'};
-let C={restaurantes:[],pedidos:[],itens:[],produtos:[],categorias:[],semanas:[],historico_precos:[],produtos_limpeza:[],categorias_limpeza:[],pedidos_limpeza:[],itens_limpeza:[]};
+let C={restaurantes:[],pedidos:[],itens:[],produtos:[],categorias:[],semanas:[],historico_precos:[],produtos_limpeza:[],categorias_limpeza:[],pedidos_limpeza:[],itens_limpeza:[],semanas_limpeza:[]};
 let restAtivo=null,ncCat='',ncSel={},pedSemId=null;
 let mesSelecionado=null;
 const semsAbertas=new Set();
@@ -435,6 +435,8 @@ async function reloadAll(){
   C.categorias_limpeza=h2.data||[];
   C.pedidos_limpeza=h3.data||[];
   C.itens_limpeza=h4.data||[];
+  const sl=await supa.from('semanas_limpeza').select('*').order('data_inicio',{ascending:false});
+  C.semanas_limpeza=sl.data||[];
 }
 
 async function refreshDados(){
@@ -2444,7 +2446,7 @@ async function fecharMesLimpeza(mes, ano){
 
   // Buscar pedidos do mês
   const pedsMes=C.pedidos_limpeza.filter(p=>{
-    const sem=C.semanas.find(s=>s.id===p.semana_id);
+    const sem=C.semanas_limpeza.find(s=>s.id===p.semana_id);
     const md=sem?mesDominante(sem):null;
     return md&&md.mes===mes&&md.ano===ano;
   });
@@ -2597,6 +2599,43 @@ async function renderRelatorioLimpeza(mes,ano){
   el.innerHTML=html;
 }
 
+
+function openNovaLimSemana(){
+  showModal(
+    '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:14px;display:flex;align-items:center;gap:8px">'
+    +'<i class="ti ti-calendar-plus" style="color:var(--c-accent)"></i> Nova semana — Limpeza'
+    +'</div>'
+    +'<div class="grid2f" style="margin-bottom:12px">'
+    +'<div class="field"><label>Data início</label><input id="lims-i" type="date" style="width:100%"></div>'
+    +'<div class="field"><label>Data fim</label><input id="lims-f" type="date" style="width:100%"></div>'
+    +'</div>'
+    +'<div class="field" style="margin-bottom:16px"><label>Nome (opcional)</label>'
+    +'<input id="lims-n" type="text" placeholder="Ex: Semana 01/07 a 07/07"></div>'
+    +'<div class="g8" style="justify-content:flex-end">'
+    +'<button class="btn" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-acc" onclick="criarLimSemana()"><i class="ti ti-check"></i> Criar semana</button>'
+    +'</div>'
+  );
+}
+
+async function criarLimSemana(){
+  const ini=document.getElementById('lims-i')?.value;
+  const fim=document.getElementById('lims-f')?.value;
+  const nomeInput=document.getElementById('lims-n')?.value.trim();
+  const fmtD=d=>{if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;};
+  const nome=nomeInput||(ini&&fim?fmtD(ini)+' a '+fmtD(fim):'Semana sem data');
+
+  const {data:nova,error}=await supa.from('semanas_limpeza').insert({
+    nome,data_inicio:ini||null,data_fim:fim||null
+  }).select().single();
+
+  if(error){toast('Erro ao criar semana: '+error.message);return;}
+  C.semanas_limpeza.unshift(nova);
+  toast('Semana de limpeza criada!');
+  closeModal();
+  renderLimpezaMeses(document.getElementById('area-limpeza'));
+}
+
 function abrirLimMes(el){
   const k=el.getAttribute('data-meskey');
   document.getElementById('area-limpeza').dataset.meskey=k;
@@ -2606,11 +2645,21 @@ function abrirLimMes(el){
 function renderLimpezaMeses(el){
   const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  // Agrupar por mês dominante — SÓ meses que têm pedidos de limpeza
+  // Agrupar por mês usando semanas_limpeza
   const porMes={};
+
+  // Incluir semanas de limpeza existentes
+  C.semanas_limpeza.forEach(s=>{
+    const md=mesDominante(s);
+    if(!md)return;
+    const k=md.ano+'-'+String(md.mes).padStart(2,'0');
+    if(!porMes[k])porMes[k]={mes:md.mes,ano:md.ano,total:0,qtdPeds:0};
+  });
+
+  // Adicionar totais dos pedidos de limpeza
   C.pedidos_limpeza.forEach(p=>{
     if(!p.semana_id)return;
-    const sem=C.semanas.find(s=>s.id===p.semana_id);
+    const sem=C.semanas_limpeza.find(s=>s.id===p.semana_id);
     if(!sem)return;
     const md=mesDominante(sem);
     if(!md)return;
@@ -2622,29 +2671,41 @@ function renderLimpezaMeses(el){
 
   const keys=Object.keys(porMes).sort((a,b)=>b.localeCompare(a));
 
+  // Cabeçalho com botão nova semana
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  html+='<div style="font-size:13px;color:var(--c-dim)">Selecione o mês para ver os pedidos</div>';
+  html+='<button class="btn btn-sm btn-acc" id="btn-lim-nova-semana"><i class="ti ti-calendar-plus"></i> Nova semana</button>';
+  html+='</div>';
+
   if(!keys.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-droplet-off"></i>Nenhum pedido de limpeza ainda.<br>Acesse uma semana e clique em "+ Pedido" para começar.</div>';
+    html+='<div class="empty"><i class="ti ti-droplet-off"></i>Nenhuma semana cadastrada ainda.<br>Crie uma semana para começar.</div>';
+    el.innerHTML=html;
+    setTimeout(()=>{
+      const btn=document.getElementById('btn-lim-nova-semana');
+      if(btn)btn.addEventListener('click',()=>openNovaLimSemana());
+    },50);
     return;
   }
 
-  let html='<div class="meses-grid">';
+  html+='<div class="meses-grid">';
   keys.forEach(k=>{
     const m=porMes[k];
     html+='<div class="mes-card" onclick="abrirLimMes(this)" data-meskey="'+k+'">';
     html+='<div class="mes-card-nome">'+mesesNomes[m.mes-1]+' '+m.ano+'</div>';
-    html+='<div class="mes-card-sub">'+m.qtdPeds+' pedido(s)</div>';
-    html+='<div class="mes-card-total">'+fmtNum(m.total)+'</div>';
+    html+='<div class="mes-card-sub">'+(m.qtdPeds>0?m.qtdPeds+' pedido(s)':'Sem pedidos')+'</div>';
+    html+='<div class="mes-card-total">'+(m.total>0?fmtNum(m.total):'—')+'</div>';
     html+='</div>';
   });
   html+='</div>';
 
-  // Botão de acesso rápido para semana atual
-  const semAtual=C.semanas[0];
-  if(semAtual){
-    html+='<div style="margin-top:8px"><button class="btn btn-acc" id="lim-nova-btn" data-semid="'+semAtual.id+'"><i class="ti ti-plus"></i> Novo pedido — '+semAtual.nome+'</button></div>';
-  }
-
   el.innerHTML=html;
+  setTimeout(()=>{
+    const btn=document.getElementById('btn-lim-nova-semana');
+    if(btn)btn.addEventListener('click',()=>openNovaLimSemana());
+    // Botão de novo pedido rápido na semana mais recente
+    const lim_nova=document.getElementById('lim-nova-btn');
+    if(lim_nova)lim_nova.addEventListener('click',()=>{limSel={};abrirLimSemDireta(lim_nova.dataset.semid);});
+  },50);
 }
 
 function abrirLimSemDireta(semId){
@@ -2660,7 +2721,7 @@ function renderLimpezaSemana2(mesKey){
   const mesesNomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const [ano,mes]=[parseInt(mesKey.split('-')[0]),parseInt(mesKey.split('-')[1])];
 
-  const sems=C.semanas.filter(s=>{
+  const sems=C.semanas_limpeza.filter(s=>{
     const md=mesDominante(s);
     return md&&md.mes===mes&&md.ano===ano;
   }).sort((a,b)=>(a.data_inicio||'').localeCompare(b.data_inicio||''));
