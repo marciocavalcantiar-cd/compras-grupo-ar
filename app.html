@@ -474,6 +474,11 @@ function setRest(id){restAtivo=id;sessionStorage.setItem('ar_rest_ativo',id);ren
 function fmtD(d){if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;}
 function semPeriodo(s){return s&&s.data_inicio&&s.data_fim?fmtD(s.data_inicio)+' a '+fmtD(s.data_fim):'';}
 function semLabel(s){if(!s)return'';const p=semPeriodo(s);const n=(s.nome||'').toUpperCase();return p?n+' ('+p+')':n;}
+const restBadgeColors={'Arvo':{bg:'#EAF3DE',fg:'#3B6D11'},'Terra':{bg:'#FAECE7',fg:'#993C1D'},'Voar':{bg:'#FBEAF0',fg:'#993556'}};
+function restBadgeHtml(nome){
+  const c=restBadgeColors[nome]||{bg:'#E6F1FB',fg:'#0C447C'};
+  return '<span style="background:'+c.bg+';color:'+c.fg+';font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap">'+(nome||'—').toUpperCase()+'</span>';
+}
 
 // ── RENDER PRINCIPAL ─────────────────────────────────
 function renderPedidos(){
@@ -1308,7 +1313,7 @@ function buildHTML(pedId){
     +'h1{font-size:20px;font-weight:700;margin:0;color:#18181A}.sub{font-size:13px;color:#888;margin-bottom:24px}'
     +'.logo{width:44px;height:44px;background:#18181A;border-radius:8px;color:#EF9F27;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}'
     +'.info{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;background:#f5f5f5;padding:14px 16px;border-radius:8px}'
-    +'.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}.ii span{font-size:13px;font-weight:500}'
+    +'.ii{text-align:center}.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}.ii span{font-size:13px;font-weight:500;white-space:nowrap}'
     +'table{width:100%;border-collapse:collapse}thead tr{background:#18181A}'
     +'th{padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#EF9F27;font-weight:600}'
     +'th:nth-child(4),th:nth-child(6){text-align:right}th:nth-child(5){text-align:center}'
@@ -1468,12 +1473,12 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
   rows.forEach(r=>{
     if(r.forn!==lastForn){
       lastForn=r.forn;
-      tbody+='<tr style="background:#18181A"><td colspan="10" style="color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;padding:7px 12px;letter-spacing:0.05em">'+r.forn+'</td></tr>';
+      tbody+='<tr style="background:#18181A"><td colspan="10" style="padding:7px 12px"><span style="color:#999;font-size:9px;font-weight:600;letter-spacing:0.05em;margin-right:8px">FORNECEDOR</span><span style="color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">'+r.forn+'</span></td></tr>';
     }
     const sub=r.valor*r.qty;
     const bg=n++%2?'#fff':'#f9f9f9';
     tbody+='<tr style="background:'+bg+'">'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:500">'+r.restNome+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #eee">'+restBadgeHtml(r.restNome)+'</td>'
       +'<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:11px;color:#888">'+r.cat+'</td>'
       +'<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:13px">'+r.item+'</td>'
       +'<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center">'+r.med+'</td>'
@@ -1486,16 +1491,16 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
       +'</tr>';
   });
   const sems=[...new Set(rows.map(r=>r.semNome))].filter(s=>s!=='—').join(', ');
-  const rests=[...new Set(rows.map(r=>r.restNome))].join(', ');
+  const rests=[...new Set(rows.map(r=>r.restNome))].join(', ').toUpperCase();
   const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
     +'<title>Espelho Geral — '+dataArquivo()+'</title>'
     +'<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#222;background:#fff}'
     +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}'
-    +'h1{font-size:18px;font-weight:700;margin:0}p{font-size:12px;color:#888;margin:4px 0 0}'
+    +'h1{font-size:18px;font-weight:700;margin:0;text-transform:uppercase}p{font-size:12px;color:#888;margin:4px 0 0}'
     +'.logo{width:48px;height:48px;background:#fff;border:1px solid #eee;border-radius:8px;padding:4px;display:flex;align-items:center;justify-content:center}'
-    +'.info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:16px}'
-    +'.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}'
-    +'.ii span{font-size:12px;font-weight:500}'
+    +'.info{display:grid;grid-template-columns:1fr 1.6fr 0.8fr 1fr;gap:10px;background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:16px}'
+    +'.ii{text-align:center}.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}'
+    +'.ii span{font-size:12px;font-weight:500;white-space:nowrap}'
     +'table{width:100%;border-collapse:collapse}thead tr{background:#18181A}'
     +'th{padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:#EF9F27;font-weight:600}'
     +'.tf td{background:#18181A;padding:9px 10px;font-weight:700;color:#EF9F27}'
@@ -1560,12 +1565,12 @@ function gerarEspelho(semId){
   rows.forEach(r=>{
     if(r.forn!==lastForn){
       lastForn=r.forn;
-      tbody+='<tr style="background:#18181A"><td colspan="8" style="color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;padding:7px 12px;letter-spacing:0.05em">'+r.forn+'</td></tr>';
+      tbody+='<tr style="background:#18181A"><td colspan="8" style="padding:7px 12px"><span style="color:#999;font-size:9px;font-weight:600;letter-spacing:0.05em;margin-right:8px">FORNECEDOR</span><span style="color:#EF9F27;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">'+r.forn+'</span></td></tr>';
     }
     const sub=r.valor*r.qty;
     const bg=n++%2?'#fff':'#f9f9f9';
     tbody+='<tr style="background:'+bg+'">'
-      +'<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:11px;color:#888">'+r.restNome+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #eee">'+restBadgeHtml(r.restNome)+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:11px;color:#888">'+r.cat+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px">'+r.item+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">'+r.med+'</td>'
@@ -1581,9 +1586,9 @@ function gerarEspelho(semId){
     +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}'
     +'h1{font-size:18px;font-weight:700;margin:0}p{font-size:12px;color:#888;margin:4px 0 0}'
     +'.logo{width:48px;height:48px;background:#fff;border:1px solid #eee;border-radius:8px;padding:4px;display:flex;align-items:center;justify-content:center}'
-    +'.info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:16px}'
-    +'.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}'
-    +'.ii span{font-size:12px;font-weight:500}'
+    +'.info{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:10px;background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:16px}'
+    +'.ii{text-align:center}.ii strong{display:block;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px}'
+    +'.ii span{font-size:12px;font-weight:500;white-space:nowrap}'
     +'table{width:100%;border-collapse:collapse}thead tr{background:#18181A}'
     +'th{padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#EF9F27;font-weight:600}'
     +'.tf td{background:#18181A;padding:9px 12px;font-weight:700;color:#EF9F27}'
