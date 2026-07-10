@@ -472,6 +472,8 @@ function renderRestTabs(){
 function setRest(id){restAtivo=id;sessionStorage.setItem('ar_rest_ativo',id);renderRestTabs();renderPedidos();}
 
 function fmtD(d){if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;}
+function semPeriodo(s){return s&&s.data_inicio&&s.data_fim?fmtD(s.data_inicio)+' a '+fmtD(s.data_fim):'';}
+function semLabel(s){if(!s)return'';const p=semPeriodo(s);return p?s.nome+' ('+p+')':s.nome;}
 
 // ── RENDER PRINCIPAL ─────────────────────────────────
 function renderPedidos(){
@@ -690,8 +692,11 @@ function renderSemanaCard(s,allPeds){
   return `<div class="semana-card${semsAbertas.has(s.id)?'':' semana-collapsed'}" id="sem-${s.id}">
     <div class="semana-head" onclick="toggleSem('${s.id}')">
       <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:500;color:var(--ar-white)">${s.nome}</div>
-        <div style="font-size:12px;color:var(--ar-dim);margin-top:2px">${C.restaurantes.find(r=>r.id===restAtivo)?.nome||""} · ${fmtD(s.data_inicio)} a ${fmtD(s.data_fim)} · ${peds.length} pedido(s) · ${fmt(totalSem)} · ${pctReal}% entregue</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+          <span style="font-size:16px;font-weight:700;color:var(--ar-accent)">${fmtD(s.data_inicio)} a ${fmtD(s.data_fim)}</span>
+          <span style="font-size:11px;font-weight:500;color:var(--ar-dim);text-transform:uppercase;letter-spacing:0.05em">${s.nome}</span>
+        </div>
+        <div style="font-size:12px;color:var(--ar-dim);margin-top:2px">${C.restaurantes.find(r=>r.id===restAtivo)?.nome||""} · ${peds.length} pedido(s) · ${fmt(totalSem)} · ${pctReal}% entregue</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <button class="btn btn-sm" onclick="event.stopPropagation();openNovoPedido('${s.id}')"><i class="ti ti-plus"></i> Pedido</button>
@@ -927,7 +932,7 @@ function openNovaSemana(){
       <i class="ti ti-calendar-week" style="color:var(--ar-accent);font-size:18px"></i> Nova semana
     </div>
 
-    <div class="field"><label>Nome</label><input id="ns-n" type="text" value="${fn(ini)} a ${fn(fim)}" style="width:100%"></div>
+    <div class="field"><label>Nome</label><input id="ns-n" type="text" value="COMPRAS CD - AR" style="width:100%"></div>
     <div class="grid2f">
       <div class="field"><label>Início</label><input id="ns-i" type="date" value="${fmt2(ini)}"></div>
       <div class="field"><label>Fim</label><input id="ns-f" type="date" value="${fmt2(fim)}"></div>
@@ -965,10 +970,7 @@ async function criarSemana(){
   const ini=document.getElementById('ns-i').value;
   const fim=document.getElementById('ns-f').value;
   const nomeInput=document.getElementById('ns-n').value.trim();
-  // Se não preencheu nome, gera automaticamente com as datas
-  const fmtDate=d=>{if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m};
-  const nomeAuto=ini&&fim?fmtDate(ini)+' a '+fmtDate(fim):'Semana sem data';
-  const nome=nomeInput||nomeAuto;
+  const nome=nomeInput||'COMPRAS CD - AR';
   await supa.from('semanas').insert({nome,data_inicio:ini,data_fim:fim});
   toast('Semana criada!');closeModal();await reloadAll();renderPedidos();
 }
@@ -1018,7 +1020,7 @@ function updateNpSemanas(){
   const sel=document.getElementById('np-sem');
   if(!sel)return;
   sel.innerHTML=sems.length
-    ?sems.map(s=>`<option value="${s.id}">${s.nome}</option>`).join('')
+    ?sems.map(s=>`<option value="${s.id}">${semLabel(s)}</option>`).join('')
     +'<option value="">— Sem semana —</option>'
     :'<option value="">— Sem semana —</option>';
 }
@@ -1138,7 +1140,7 @@ function openNovoPedido(semId){
     <div style="font-size:16px;font-weight:500;color:var(--ar-white);margin-bottom:4px;display:flex;align-items:center;gap:8px">
       <i class="ti ti-shopping-cart" style="color:var(--ar-accent);font-size:18px"></i> Novo pedido
     </div>
-    <div style="font-size:12px;color:var(--ar-accent-dim);margin-bottom:16px">${rest?.nome||''}${sem?' · '+sem.nome:''}</div>
+    <div style="font-size:12px;color:var(--ar-accent-dim);margin-bottom:16px">${rest?.nome||''}${sem?' · '+semLabel(sem):''}</div>
     <div class="grid2f" style="margin-bottom:12px">
       <div class="field"><label>Fornecedor / Título</label><input id="np-t" type="text" placeholder="Ex: Frigorifico Norte" style="width:100%"></div>
       <div class="field"><label>Data</label><input id="np-d" type="date" style="width:100%"></div>
@@ -1446,7 +1448,7 @@ function _gerarEspelhoGeral(statusFiltro, restFiltro, semFiltro){
     C.itens.filter(i=>i.pedido_id===p.id&&statusFiltro.includes(i.status||'Aguardando')).forEach(it=>{
       rows.push({
         restNome:rest?rest.nome:'—',
-        semNome:sem?sem.nome:'—',
+        semNome:sem?semLabel(sem):'—',
         forn:it.fornecedor||p.titulo||'—',
         cat:it.categoria||'—',
         item:it.produto||'—',
@@ -1574,7 +1576,7 @@ function gerarEspelho(semId){
       +'</tr>';
   });
   const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    +'<title>Espelho — '+sem.nome+' — '+dataArquivo()+'</title>'
+    +'<title>Espelho — '+semLabel(sem)+' — '+dataArquivo()+'</title>'
     +'<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:24px;color:#222;background:#fff}'
     +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}'
     +'h1{font-size:18px;font-weight:700;margin:0}p{font-size:12px;color:#888;margin:4px 0 0}'
@@ -1590,11 +1592,11 @@ function gerarEspelho(semId){
     +'.s{border-top:1.5px solid #222;width:200px;text-align:center;padding-top:4px;font-size:11px;color:#666}'
     +'@media print{@page{margin:8mm;size:A4 landscape}body{padding:0}}'
     +'</style></head><body>'
-    +'<div class="hdr"><div><h1>Espelho de Recebimento</h1><p>Grupo AR — '+sem.nome+'</p></div>'
+    +'<div class="hdr"><div><h1>Espelho de Recebimento</h1><p>Grupo AR — '+semLabel(sem)+'</p></div>'
     +'<div class="logo"><img src="'+logo_data+'" style="width:40px;height:40px;object-fit:contain"></div>'
     +'</div>'
     +'<div class="info">'
-    +'<div class="ii"><strong>Semana</strong><span>'+sem.nome+'</span></div>'
+    +'<div class="ii"><strong>Semana</strong><span>'+semLabel(sem)+'</span></div>'
     +'<div class="ii"><strong>Total de itens</strong><span>'+rows.length+'</span></div>'
     +'<div class="ii"><strong>Gerado em</strong><span>'+new Date().toLocaleDateString('pt-BR')+'</span></div>'
     +'<div class="ii"><strong>Total</strong><span>'+fmtNum(total)+'</span></div>'
@@ -1609,7 +1611,7 @@ function gerarEspelho(semId){
     +'</table>'
     +'<div class="sig"><div class="s">Responsável pelo recebimento</div><div class="s">Conferente / Estoquista</div></div>'
     +'</body></html>';
-  abrirEspelhoModal(html,'Espelho — '+sem.nome+' ('+dataArquivo()+')');
+  abrirEspelhoModal(html,'Espelho — '+semLabel(sem)+' ('+dataArquivo()+')');
 }
 
 
