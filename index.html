@@ -2360,7 +2360,7 @@ function _gerarRelatorioProvisorio(semFiltro, restFiltro){
 
     html+='<div class="rest-section">';
     html+='<div class="rest-header" style="background:'+cor+'">';
-    html+='<span style="font-size:15px;font-weight:700">'+r.nome+'</span>';
+    html+='<span style="font-size:15px;font-weight:700">'+r.nome.toUpperCase()+'</span>';
     html+='<span style="font-size:18px;font-weight:700">'+fmtNum(total)+'</span>';
     html+='</div>';
     html+='<div class="rest-stats">';
@@ -2409,7 +2409,7 @@ function _gerarRelatorioProvisorio(semFiltro, restFiltro){
 
     // Total do restaurante
     html+='<tr style="background:#F5F6FA;font-weight:700">';
-    html+='<td colspan="6" style="text-align:right;font-size:11px;color:#6B7080;text-transform:uppercase;letter-spacing:0.05em">Total '+r.nome+'</td>';
+    html+='<td colspan="6" style="text-align:right;font-size:11px;color:#6B7080;text-transform:uppercase;letter-spacing:0.05em">Total '+r.nome.toUpperCase()+'</td>';
     html+='<td class="td-r" style="font-size:14px;color:'+cor+'">'+fmtNum(total)+'</td>';
     html+='<td></td></tr>';
     html+='</tbody></table></div>';
