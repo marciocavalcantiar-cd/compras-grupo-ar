@@ -473,7 +473,7 @@ function setRest(id){restAtivo=id;sessionStorage.setItem('ar_rest_ativo',id);ren
 
 function fmtD(d){if(!d)return'';const[y,m,day]=d.split('-');return day+'/'+m;}
 function semPeriodo(s){return s&&s.data_inicio&&s.data_fim?fmtD(s.data_inicio)+' a '+fmtD(s.data_fim):'';}
-function semLabel(s){if(!s)return'';const p=semPeriodo(s);return p?s.nome+' ('+p+')':s.nome;}
+function semLabel(s){if(!s)return'';const p=semPeriodo(s);const n=(s.nome||'').toUpperCase();return p?n+' ('+p+')':n;}
 
 // ── RENDER PRINCIPAL ─────────────────────────────────
 function renderPedidos(){
@@ -694,7 +694,7 @@ function renderSemanaCard(s,allPeds){
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
           <span style="font-size:16px;font-weight:700;color:var(--ar-accent)">${fmtD(s.data_inicio)} a ${fmtD(s.data_fim)}</span>
-          <span style="font-size:11px;font-weight:500;color:var(--ar-dim);text-transform:uppercase;letter-spacing:0.05em">${s.nome}</span>
+          <span style="font-size:11px;font-weight:500;color:var(--ar-dim);text-transform:uppercase;letter-spacing:0.05em">${(s.nome||'').toUpperCase()}</span>
         </div>
         <div style="font-size:12px;color:var(--ar-dim);margin-top:2px">${C.restaurantes.find(r=>r.id===restAtivo)?.nome||""} · ${peds.length} pedido(s) · ${fmt(totalSem)} · ${pctReal}% entregue</div>
       </div>
@@ -959,7 +959,7 @@ function editarSemana(id){
 }
 
 async function salvarNomeSemana(id){
-  const nome=document.getElementById('es-nome').value.trim();
+  const nome=document.getElementById('es-nome').value.trim().toUpperCase();
   if(!nome){alert('Informe um nome.');return}
   await supa.from('semanas').update({nome}).eq('id',id);
   C.semanas=C.semanas.map(s=>s.id===id?{...s,nome}:s);
@@ -970,7 +970,7 @@ async function criarSemana(){
   const ini=document.getElementById('ns-i').value;
   const fim=document.getElementById('ns-f').value;
   const nomeInput=document.getElementById('ns-n').value.trim();
-  const nome=nomeInput||'COMPRAS CD - AR';
+  const nome=(nomeInput||'COMPRAS CD - AR').toUpperCase();
   await supa.from('semanas').insert({nome,data_inicio:ini,data_fim:fim});
   toast('Semana criada!');closeModal();await reloadAll();renderPedidos();
 }
