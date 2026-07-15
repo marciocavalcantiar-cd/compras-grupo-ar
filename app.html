@@ -760,7 +760,7 @@ function renderTabelaItens(peds,showToolbar){
       ?`<button class="btn-xs btn-xs-acc" onclick="confirmarItem('${r.itemId}','${r.pedId}')"><i class="ti ti-check"></i></button>`:'';
     const sbadge=`<span class="ibadge ${SC[r.status]||'ib-ag'}" onclick="cycleItem('${r.itemId}','${r.pedId}')" title="Clique para mudar">${r.status}</span>`;
     const prevInp=`<div style="position:relative;display:inline-flex;align-items:center" title="Previsão de entrega">
-      <input type="date" value="${r.previsao||''}" onchange="updItemPrevisao('${r.itemId}',this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%">
+      <input type="date" value="${r.previsao||''}" onchange="updItemPrevisao('${r.itemId}',this.value);this.nextElementSibling.textContent=this.value?fmtD(this.value):'+ data'" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%">
       <span style="background:var(--c-accent-bg);color:var(--c-accent);font-size:11px;font-weight:600;padding:2px 6px;border-radius:999px;pointer-events:none;white-space:nowrap">${r.previsao?fmtD(r.previsao):'+ data'}</span>
     </div>`;
     rowsHtml+=`<tr>
@@ -2868,7 +2868,7 @@ function renderLimpezaSemana2(mesKey){
       if(nomeInp)nomeInp.addEventListener('change',()=>updLimItemNome(itemId,nomeInp.value));
       if(qtyInp)qtyInp.addEventListener('change',()=>updLimItemQty(itemId,pedId,qtyInp.value));
       if(valInp)valInp.addEventListener('change',()=>updLimItemValor(itemId,pedId,valInp.value));
-      if(prevInp)prevInp.addEventListener('change',()=>updLimItemPrevisao(itemId,prevInp.value));
+      if(prevInp)prevInp.addEventListener('change',()=>{updLimItemPrevisao(itemId,prevInp.value);prevInp.nextElementSibling.textContent=prevInp.value?fmtD(prevInp.value):'+ data';});
       if(badge)badge.addEventListener('click',()=>cicleLimStatus(itemId,pedId));
       if(delBtn)delBtn.addEventListener('click',()=>delLimItem(itemId,pedId));
     });
