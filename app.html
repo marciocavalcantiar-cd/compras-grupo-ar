@@ -3045,12 +3045,21 @@ async function criarPedidoLimpeza(semId){
   }).select().single();
   if(error){toast('Erro ao criar pedido: '+error.message);if(criarBtn)criarBtn.disabled=false;return;}
 
-  await supa.from('itens_limpeza').insert(ids.map(id=>{
+  const {data:itensLimInseridos}=await supa.from('itens_limpeza').insert(ids.map(id=>{
     const p=limSel[id];
     return{pedido_id:ped.id,produto:p.nome,categoria:p.categoria,unidade:p.unidade,
       quantidade:parseFloat(p.qty)||null,valor_unit:parseFloat(p.valor)||null,
       fornecedor:forn,status:'Aguardando'};
-  }));
+  })).select();
+
+  // Registrar no histórico de preços (somente itens com valor preenchido)
+  if(itensLimInseridos&&itensLimInseridos.length){
+    const histRows=itensLimInseridos.filter(it=>it.valor_unit>0).map(it=>({
+      produto_nome:it.produto,categoria:it.categoria,fornecedor:it.fornecedor,
+      valor_unit:it.valor_unit,unidade:it.unidade,restaurante_nome:'Limpeza'
+    }));
+    if(histRows.length)await supa.from('historico_precos').insert(histRows);
+  }
 
   limSel={};
   toast('Pedido de limpeza criado!');
@@ -3086,6 +3095,16 @@ async function updLimItemValor(itemId,pedId,val){
   await supa.from('itens_limpeza').update({valor_unit:v}).eq('id',itemId);
   C.itens_limpeza=C.itens_limpeza.map(i=>i.id===itemId?{...i,valor_unit:v}:i);
   await recalcLimTotal(pedId);
+  // Registrar mudança no histórico de preços
+  if(v>0){
+    const it=C.itens_limpeza.find(i=>i.id===itemId);
+    if(it){
+      await supa.from('historico_precos').insert({
+        produto_nome:it.produto,categoria:it.categoria,fornecedor:it.fornecedor||'—',
+        valor_unit:v,unidade:it.unidade,restaurante_nome:'Limpeza'
+      });
+    }
+  }
   const mesKey=document.getElementById('area-limpeza').dataset.meskey||'';
   if(mesKey)renderLimpezaSemana2(mesKey);
 }
