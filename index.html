@@ -759,7 +759,10 @@ function renderTabelaItens(peds,showToolbar){
     const confirmar=r.status==='Aguardando'
       ?`<button class="btn-xs btn-xs-acc" onclick="confirmarItem('${r.itemId}','${r.pedId}')"><i class="ti ti-check"></i></button>`:'';
     const sbadge=`<span class="ibadge ${SC[r.status]||'ib-ag'}" onclick="cycleItem('${r.itemId}','${r.pedId}')" title="Clique para mudar">${r.status}</span>`;
-    const prevInp=`<input type="date" value="${r.previsao||''}" onchange="updItemPrevisao('${r.itemId}',this.value)" title="Previsão de entrega" style="background:var(--c-accent-bg);color:var(--c-accent);font-size:11px;font-weight:600;padding:2px 6px;border:none;border-radius:999px;font-family:inherit">`;
+    const prevInp=`<div style="position:relative;display:inline-flex;align-items:center" title="Previsão de entrega">
+      <input type="date" value="${r.previsao||''}" onchange="updItemPrevisao('${r.itemId}',this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%">
+      <span style="background:var(--c-accent-bg);color:var(--c-accent);font-size:11px;font-weight:600;padding:2px 6px;border-radius:999px;pointer-events:none;white-space:nowrap">${r.previsao?fmtD(r.previsao):'+ data'}</span>
+    </div>`;
     rowsHtml+=`<tr>
       <td class="cat">${r.cat}</td>
       <td style="max-width:220px"><input type="text" value="${r.item}" onchange="updItemNome('${r.itemId}',this.value)" style="width:100%;padding:3px 4px;font-size:13px;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--c-text);font-family:inherit" onfocus="this.style.borderColor='var(--c-accent)'" onblur="this.style.borderColor='transparent'" title="Clique para editar o nome"></td>
@@ -2809,7 +2812,7 @@ function renderLimpezaSemana2(mesKey){
           html+='<td class="r"><input type="number" min="0" step="0.01" value="'+(it.quantidade||'')+'" class="lim-qty-inp" style="width:65px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--c-border2);font-family:inherit"></td>';
           html+='<td class="r"><input type="number" min="0" step="0.01" value="'+(it.valor_unit||'')+'" class="lim-val-inp" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--c-border2);font-family:inherit"></td>';
           html+='<td class="r" style="font-weight:500">'+(sub>0?fmtNum(sub):'—')+'</td>';
-          html+='<td style="text-align:center;white-space:nowrap"><input type="date" value="'+(it.previsao_entrega||'')+'" class="lim-prev-inp" style="background:var(--c-accent-bg);color:var(--c-accent);font-size:11px;font-weight:600;padding:2px 6px;border:none;border-radius:999px;font-family:inherit;margin-right:4px" title="Previsão de entrega"><span class="ibadge lim-status-badge '+chipCls+'">'+(it.status||'Aguardando')+'</span></td>';
+          html+='<td style="text-align:center;white-space:nowrap"><div style="position:relative;display:inline-flex;align-items:center" title="Previsão de entrega"><input type="date" value="'+(it.previsao_entrega||'')+'" class="lim-prev-inp" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%"><span style="background:var(--c-accent-bg);color:var(--c-accent);font-size:11px;font-weight:600;padding:2px 6px;border-radius:999px;pointer-events:none;white-space:nowrap">'+(it.previsao_entrega?fmtD(it.previsao_entrega):'+ data')+'</span></div> <span class="ibadge lim-status-badge '+chipCls+'">'+(it.status||'Aguardando')+'</span></td>';
           html+='<td><button class="btn-del btn btn-xs lim-del-btn"><i class="ti ti-trash"></i></button></td>';
           html+='</tr>';
         });
