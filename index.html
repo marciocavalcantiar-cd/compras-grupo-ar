@@ -731,6 +731,7 @@ function renderTabelaItens(peds,showToolbar){
         cat:it.categoria||'—',item:it.produto,med:it.unidade||'KG',
         valor:parseFloat(it.valor_unit)||0,qtd:parseFloat(it.quantidade)||0,
         forn:it.fornecedor||p.titulo||'—',
+        previsao:it.previsao_entrega||'',
         status:it.status||'Aguardando'
       });
     });
@@ -758,6 +759,7 @@ function renderTabelaItens(peds,showToolbar){
     const confirmar=r.status==='Aguardando'
       ?`<button class="btn-xs btn-xs-acc" onclick="confirmarItem('${r.itemId}','${r.pedId}')"><i class="ti ti-check"></i></button>`:'';
     const sbadge=`<span class="ibadge ${SC[r.status]||'ib-ag'}" onclick="cycleItem('${r.itemId}','${r.pedId}')" title="Clique para mudar">${r.status}</span>`;
+    const prevInp=`<input type="date" value="${r.previsao||''}" onchange="updItemPrevisao('${r.itemId}',this.value)" title="Previsão de entrega" style="background:var(--c-accent-bg);color:var(--c-accent);font-size:11px;font-weight:600;padding:2px 6px;border:none;border-radius:999px;font-family:inherit">`;
     rowsHtml+=`<tr>
       <td class="cat">${r.cat}</td>
       <td style="max-width:220px"><input type="text" value="${r.item}" onchange="updItemNome('${r.itemId}',this.value)" style="width:100%;padding:3px 4px;font-size:13px;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--c-text);font-family:inherit" onfocus="this.style.borderColor='var(--c-accent)'" onblur="this.style.borderColor='transparent'" title="Clique para editar o nome"></td>
@@ -766,7 +768,7 @@ function renderTabelaItens(peds,showToolbar){
       <td class="r"><input type="number" min="0" step="0.5" value="${r.qtd||''}" onchange="updItemQtd('${r.itemId}','${r.pedId}',this.value)" style="width:60px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--ar-border2);color:var(--ar-white);font-family:inherit" onfocus="this.style.borderColor='var(--ar-accent)'" onblur="this.style.borderColor='var(--ar-border2)'"></td>
       <td class="forn" style="max-width:150px"><input type="text" value="${r.forn}" onchange="updItemForn('${r.itemId}','${r.pedId}',this.value)" style="width:100%;padding:3px 4px;font-size:13px;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--c-accent);font-family:inherit;font-weight:500" onfocus="this.style.borderColor='var(--c-accent)'" onblur="this.style.borderColor='transparent'" title="Clique para editar o fornecedor"></td>
       <td class="r" style="font-weight:500" id="sub-${r.itemId}">${sub>0?fmt(sub):'—'}</td>
-      <td style="white-space:nowrap;display:flex;align-items:center;gap:4px">${sbadge} ${confirmar}<button class="btn-xs btn-del" onclick="delItem('${r.itemId}','${r.pedId}')" title="Excluir item" style="padding:2px 6px;color:var(--ar-red);border-color:transparent"><i class="ti ti-trash" style="font-size:12px"></i></button></td>
+      <td style="white-space:nowrap;display:flex;align-items:center;gap:4px">${prevInp} ${sbadge} ${confirmar}<button class="btn-xs btn-del" onclick="delItem('${r.itemId}','${r.pedId}')" title="Excluir item" style="padding:2px 6px;color:var(--ar-red);border-color:transparent"><i class="ti ti-trash" style="font-size:12px"></i></button></td>
     </tr>`;
   });
   rowsHtml+=`<tr class="total-row"><td colspan="6" style="text-align:right;padding-right:10px">Total</td><td class="r" style="font-weight:500;color:var(--ar-white)">${fmt(totalGeral)}</td><td></td></tr>`;
@@ -880,6 +882,11 @@ async function updItemMed(itemId, val){
   if(!v)return;
   await supa.from('pedido_itens').update({unidade:v}).eq('id',itemId);
   C.itens=C.itens.map(i=>i.id===itemId?{...i,unidade:v}:i);
+}
+
+async function updItemPrevisao(itemId, val){
+  await supa.from('pedido_itens').update({previsao_entrega:val||null}).eq('id',itemId);
+  C.itens=C.itens.map(i=>i.id===itemId?{...i,previsao_entrega:val||null}:i);
 }
 
 async function updItemValor(itemId,pedId,val){
@@ -1191,7 +1198,7 @@ function filtrarNp(){
 }
 function toggleProd(id,nome,un){
   if(ncSel[id])delete ncSel[id];
-  else ncSel[id]={nome,unidade:un,qty:'',valor:'',categoria:ncCat};
+  else ncSel[id]={nome,unidade:un,qty:'',valor:'',previsao:'',categoria:ncCat};
   renderNpSel();
 }
 function ultimoPreco(nomeProd){
@@ -1209,7 +1216,7 @@ function renderNpSel(){
   el.innerHTML='<div class="sep"></div>'
     +'<div class="slbl">Itens selecionados ('+ids.length+')</div>'
     +'<div style="overflow-x:auto"><table>'
-    +'<thead><tr><th>Produto</th><th>Qtd</th><th>Valor unit. (R$)</th><th></th></tr></thead>'
+    +'<thead><tr><th>Produto</th><th>Qtd</th><th>Valor unit. (R$)</th><th>Previsão entrega</th><th></th></tr></thead>'
     +'<tbody>'+ids.map(id=>{
       const p=ncSel[id];
       const hist=ultimoPreco(p.nome);
@@ -1231,6 +1238,7 @@ function renderNpSel(){
         +'<td style="font-size:12px">'+p.nome+' <span style="color:var(--c-dim)">'+p.unidade+'</span></td>'
         +'<td><input type="number" min="0" step="0.5" value="'+p.qty+'" onchange="updNpQty(this,\''+id+'\')" style="width:70px;padding:4px 8px;font-size:12px"></td>'
         +'<td><div><input type="number" min="0" step="0.01" value="'+p.valor+'" onchange="updNpValor(this,\''+id+'\')" style="width:100px;padding:4px 8px;font-size:12px" placeholder="0.00">'+histHtml+'</div></td>'
+        +'<td><input type="date" value="'+(p.previsao||'')+'" onchange="updNpPrevisao(this,\''+id+'\')" style="padding:4px 6px;font-size:12px"></td>'
         +'<td><span style="cursor:pointer;color:var(--c-red)" onclick="remNp(\''+id+'\')">&#x2715;</span></td>'
         +'</tr>';
     }).join('')+'</tbody></table></div>';
@@ -1238,6 +1246,7 @@ function renderNpSel(){
 
 function updNpQty(el,id){if(ncSel[id])ncSel[id].qty=el.value;}
 function updNpValor(el,id){if(ncSel[id])ncSel[id].valor=el.value;}
+function updNpPrevisao(el,id){if(ncSel[id])ncSel[id].previsao=el.value;}
 function remNp(id){remP(id);}
 
 function updP(id,f,v){if(ncSel[id])ncSel[id][f]=v}
@@ -1259,6 +1268,7 @@ async function criarPedido(){
     const p=ncSel[id];
     return{pedido_id:ped.id,produto:p.nome,categoria:p.categoria,unidade:p.unidade,
       quantidade:parseFloat(p.qty)||null,valor_unit:parseFloat(p.valor)||null,
+      previsao_entrega:p.previsao||null,
       fornecedor:titulo,status:'Aguardando'};
   })).select();
   // Registrar no histórico de preços (somente itens com valor preenchido)
@@ -2799,7 +2809,7 @@ function renderLimpezaSemana2(mesKey){
           html+='<td class="r"><input type="number" min="0" step="0.01" value="'+(it.quantidade||'')+'" class="lim-qty-inp" style="width:65px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--c-border2);font-family:inherit"></td>';
           html+='<td class="r"><input type="number" min="0" step="0.01" value="'+(it.valor_unit||'')+'" class="lim-val-inp" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;background:transparent;border:none;border-bottom:1px solid var(--c-border2);font-family:inherit"></td>';
           html+='<td class="r" style="font-weight:500">'+(sub>0?fmtNum(sub):'—')+'</td>';
-          html+='<td style="text-align:center"><span class="ibadge lim-status-badge '+chipCls+'">'+(it.status||'Aguardando')+'</span></td>';
+          html+='<td style="text-align:center;white-space:nowrap"><input type="date" value="'+(it.previsao_entrega||'')+'" class="lim-prev-inp" style="background:var(--c-accent-bg);color:var(--c-accent);font-size:11px;font-weight:600;padding:2px 6px;border:none;border-radius:999px;font-family:inherit;margin-right:4px" title="Previsão de entrega"><span class="ibadge lim-status-badge '+chipCls+'">'+(it.status||'Aguardando')+'</span></td>';
           html+='<td><button class="btn-del btn btn-xs lim-del-btn"><i class="ti ti-trash"></i></button></td>';
           html+='</tr>';
         });
@@ -2849,11 +2859,13 @@ function renderLimpezaSemana2(mesKey){
       const nomeInp=row.querySelector('.lim-nome-inp');
       const qtyInp=row.querySelector('.lim-qty-inp');
       const valInp=row.querySelector('.lim-val-inp');
+      const prevInp=row.querySelector('.lim-prev-inp');
       const badge=row.querySelector('.lim-status-badge');
       const delBtn=row.querySelector('.lim-del-btn');
       if(nomeInp)nomeInp.addEventListener('change',()=>updLimItemNome(itemId,nomeInp.value));
       if(qtyInp)qtyInp.addEventListener('change',()=>updLimItemQty(itemId,pedId,qtyInp.value));
       if(valInp)valInp.addEventListener('change',()=>updLimItemValor(itemId,pedId,valInp.value));
+      if(prevInp)prevInp.addEventListener('change',()=>updLimItemPrevisao(itemId,prevInp.value));
       if(badge)badge.addEventListener('click',()=>cicleLimStatus(itemId,pedId));
       if(delBtn)delBtn.addEventListener('click',()=>delLimItem(itemId,pedId));
     });
@@ -2992,7 +3004,7 @@ function filtrarLimProd(){
 
 function toggleLimProd(id,nome,un,cat){
   if(limSel[id])delete limSel[id];
-  else limSel[id]={nome,unidade:un,categoria:cat||'',qty:'',valor:''};
+  else limSel[id]={nome,unidade:un,categoria:cat||'',qty:'',valor:'',previsao:''};
   filtrarLimProd();
 }
 
@@ -3002,12 +3014,13 @@ function renderLimSel(){
   if(!el||!ids.length){if(el)el.innerHTML='';return;}
   el.innerHTML='<hr style="margin:8px 0;border:none;border-top:1px solid var(--c-border)">'
     +'<div class="slbl" style="margin-bottom:6px">Itens selecionados ('+ids.length+')</div>'
-    +'<table style="width:100%"><thead><tr><th>Produto</th><th>Qtd</th><th>Valor unit.</th><th></th></tr></thead><tbody>'
+    +'<table style="width:100%"><thead><tr><th>Produto</th><th>Qtd</th><th>Valor unit.</th><th>Previsão entrega</th><th></th></tr></thead><tbody>'
     +ids.map(id=>{
       const p=limSel[id];
       return '<tr class="lim-sel-row" data-selid="'+id+'"><td style="font-size:12px">'+p.nome+' <span style="color:var(--c-dim)">'+p.unidade+'</span></td>'
         +'<td><input type="number" min="0" step="0.01" value="'+p.qty+'" class="lim-np-qty" style="width:65px;padding:4px;font-size:12px"></td>'
         +'<td><input type="number" min="0" step="0.01" value="'+p.valor+'" class="lim-np-val" style="width:80px;padding:4px;font-size:12px" placeholder="0.00"></td>'
+        +'<td><input type="date" value="'+(p.previsao||'')+'" class="lim-np-prev" style="padding:4px;font-size:12px"></td>'
         +'<td><button class="lim-rem-btn" style="cursor:pointer;color:var(--c-red);background:none;border:none;font-size:14px">✕</button></td>'
     }).join('')+'</tbody></table>';
   // Event delegation para itens selecionados
@@ -3016,9 +3029,11 @@ function renderLimSel(){
       const id=row.dataset.selid;
       const qty=row.querySelector('.lim-np-qty');
       const val=row.querySelector('.lim-np-val');
+      const prev=row.querySelector('.lim-np-prev');
       const rem=row.querySelector('.lim-rem-btn');
       if(qty)qty.addEventListener('change',()=>updLimNpQty(qty,id));
       if(val)val.addEventListener('change',()=>updLimNpValor(val,id));
+      if(prev)prev.addEventListener('change',()=>updLimNpPrevisao(prev,id));
       if(rem)rem.addEventListener('click',()=>remLimP(id));
     });
   },50);
@@ -3026,6 +3041,7 @@ function renderLimSel(){
 
 function updLimNpQty(el,id){if(limSel[id])limSel[id].qty=el.value;}
 function updLimNpValor(el,id){if(limSel[id])limSel[id].valor=el.value;}
+function updLimNpPrevisao(el,id){if(limSel[id])limSel[id].previsao=el.value;}
 function remLimP(id){delete limSel[id];filtrarLimProd();}
 
 async function criarPedidoLimpeza(semId){
@@ -3049,6 +3065,7 @@ async function criarPedidoLimpeza(semId){
     const p=limSel[id];
     return{pedido_id:ped.id,produto:p.nome,categoria:p.categoria,unidade:p.unidade,
       quantidade:parseFloat(p.qty)||null,valor_unit:parseFloat(p.valor)||null,
+      previsao_entrega:p.previsao||null,
       fornecedor:forn,status:'Aguardando'};
   })).select();
 
@@ -3114,6 +3131,11 @@ async function recalcLimTotal(pedId){
   const total=its.reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
   await supa.from('pedidos_limpeza').update({total}).eq('id',pedId);
   C.pedidos_limpeza=C.pedidos_limpeza.map(p=>p.id===pedId?{...p,total}:p);
+}
+
+async function updLimItemPrevisao(itemId,val){
+  await supa.from('itens_limpeza').update({previsao_entrega:val||null}).eq('id',itemId);
+  C.itens_limpeza=C.itens_limpeza.map(i=>i.id===itemId?{...i,previsao_entrega:val||null}:i);
 }
 
 async function cicleLimStatus(itemId,pedId){
