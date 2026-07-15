@@ -801,7 +801,7 @@ function renderTabelaItens(peds,showToolbar){
         ${thSort('qtd','Qtd.')}
         ${thSort('fornecedor','Fornecedor')}
         ${thSort('total','Total')}
-        <th>Status</th>
+        <th>Previsão / Status</th>
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>
@@ -2790,7 +2790,7 @@ function renderLimpezaSemana2(mesKey){
       const forns=[...new Set(peds.map(p=>p.fornecedor))].sort();
       html+='<div class="tbl-outer"><table class="ped-table"><thead><tr>';
       html+='<th>Categoria</th><th>Produto</th><th style="text-align:center">Med.</th>';
-      html+='<th class="r">Qtd.</th><th class="r">Valor unit.</th><th class="r">Total</th><th style="text-align:center">Status</th><th></th>';
+      html+='<th class="r">Qtd.</th><th class="r">Valor unit.</th><th class="r">Total</th><th style="text-align:center">Previsão / Status</th><th></th>';
       html+='</tr></thead><tbody>';
 
       forns.forEach(forn=>{
