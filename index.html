@@ -2791,7 +2791,7 @@ function renderLimpezaSemana2(mesKey){
         itensForn.forEach(it=>{
           const sub=(parseFloat(it.valor_unit)||0)*(parseFloat(it.quantidade)||0);
           const chipCls=it.status==='Entregue'?'ib-en':it.status==='Previsto'?'ib-pr':'ib-ag';
-          const pedId=pedsForn[0]?.id||'';
+          const pedId=it.pedido_id||'';
           html+='<tr data-itemid="'+it.id+'" data-pedid="'+pedId+'" class="lim-item-row">';
           html+='<td class="cat">'+(it.categoria||'—')+'</td>';
           html+='<td><input type="text" value="'+it.produto.replace(/"/g,'&quot;')+ '" class="lim-nome-inp" style="width:100%;padding:2px 4px;font-size:13px;background:transparent;border:none;border-bottom:1px solid transparent;font-family:inherit"></td>';
