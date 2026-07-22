@@ -2741,6 +2741,169 @@ async function renderRelatorioLimpeza(mes,ano){
 }
 
 
+function gerarRelatorioLimpezaPrint(){
+  const semsOpts=[...C.semanas_limpeza].sort((a,b)=>(b.data_inicio||'').localeCompare(a.data_inicio||'')).map(s=>{
+    return '<option value="'+s.id+'">'+semLabel(s)+'</option>';
+  }).join('');
+
+  showModal(
+    '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:4px;display:flex;align-items:center;gap:8px">'
+    +'<i class="ti ti-file-analytics" style="color:var(--c-accent);font-size:18px"></i> Relatório de Material de Limpeza'
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--c-dim);margin-bottom:16px">Escolha o período para gerar o relatório</div>'
+    +'<div class="field" style="margin-bottom:14px">'
+    +'<label>Semana</label>'
+    +'<select id="rp-lim-semana" style="width:100%">'
+    +'<option value="">— Todas as semanas —</option>'
+    +semsOpts
+    +'</select>'
+    +'</div>'
+    +'<div class="g8" style="justify-content:flex-end">'
+    +'<button class="btn" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-acc" onclick="confirmarRelatorioLimpezaPrint()"><i class="ti ti-file-analytics"></i> Gerar relatório</button>'
+    +'</div>'
+  );
+}
+
+function confirmarRelatorioLimpezaPrint(){
+  const semFiltro=document.getElementById('rp-lim-semana')?.value||'';
+  closeModal();
+  _gerarRelatorioLimpezaPrint(semFiltro);
+}
+
+function _gerarRelatorioLimpezaPrint(semFiltro){
+  const agora=new Date();
+  const cor='#3B6FE8';
+
+  const pedsConsiderados=semFiltro?C.pedidos_limpeza.filter(p=>p.semana_id===semFiltro):C.pedidos_limpeza;
+  const semsAtivas=[...new Set(pedsConsiderados.map(p=>p.semana_id).filter(Boolean))]
+    .map(id=>C.semanas_limpeza.find(s=>s.id===id)).filter(Boolean)
+    .map(s=>semLabel(s)).join(', ');
+
+  const itens=pedsConsiderados.flatMap(p=>C.itens_limpeza.filter(i=>i.pedido_id===p.id));
+  if(!itens.length){toast('Nenhum item encontrado para esse período');return;}
+
+  const total=itens.reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+  const entregue=itens.filter(i=>i.status==='Entregue').reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+  const previsto=itens.filter(i=>i.status==='Previsto').reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+  const aguardando=itens.filter(i=>!i.status||i.status==='Aguardando').reduce((s,i)=>s+(parseFloat(i.valor_unit)||0)*(parseFloat(i.quantidade)||0),0);
+  const pct=total>0?Math.round(entregue/total*100):0;
+
+  let html='<!DOCTYPE html><html><head><meta charset="UTF-8">';
+  html+='<title>Relatório de Material de Limpeza — Grupo AR — '+dataArquivo()+'</title>';
+  html+='<style>';
+  html+='*{box-sizing:border-box;margin:0;padding:0}';
+  html+='body{font-family:Arial,sans-serif;background:#fff;color:#1C1E2E;font-size:13px}';
+  html+='.page{max-width:960px;margin:0 auto;padding:32px 28px}';
+  html+='.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:18px;border-bottom:2px solid #1C1E2E}';
+  html+='.logo{width:48px;height:48px;padding:5px;border:1px solid #E8E9EF;border-radius:8px}';
+  html+='.h-info h1{font-size:19px;font-weight:700;letter-spacing:-0.02em}';
+  html+='.h-info p{font-size:12px;color:#6B7080;margin-top:3px}';
+  html+='.badge-prov{background:#FFF3E0;color:#E07C1A;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid #F0C070;display:inline-block;margin-top:5px}';
+  html+='.rest-section{margin-bottom:32px}';
+  html+='.rest-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:8px 8px 0 0;color:#fff}';
+  html+='.rest-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #E8E9EF;border-top:none}';
+  html+='.rst{padding:12px 14px;border-right:1px solid #E8E9EF;border-bottom:1px solid #E8E9EF}';
+  html+='.rst:last-child{border-right:none}';
+  html+='.rst-l{font-size:10px;font-weight:600;color:#9DA3B4;text-transform:uppercase;margin-bottom:4px}';
+  html+='.rst-v{font-size:15px;font-weight:700;color:#1C1E2E}';
+  html+='.rst-v.green{color:#1A8A55}.rst-v.orange{color:#E07C1A}.rst-v.gray{color:#6B7080}';
+  html+='.prog-wrap{border:1px solid #E8E9EF;border-top:none;padding:10px 14px}';
+  html+='.prog{height:5px;background:#E8E9EF;border-radius:3px;overflow:hidden}';
+  html+='.prog-fill{height:100%;border-radius:3px}';
+  html+='.prog-lbl{font-size:11px;color:#6B7080;margin-top:4px;text-align:right}';
+  html+='table{width:100%;border-collapse:collapse;font-size:12px;border:1px solid #E8E9EF;border-top:none;border-radius:0 0 8px 8px;overflow:hidden}';
+  html+='th{padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#9DA3B4;text-transform:uppercase;letter-spacing:0.05em;background:#F5F6FA;border-bottom:1.5px solid #E8E9EF}';
+  html+='td{padding:8px 10px;border-bottom:1px solid #F0F1F5;vertical-align:middle}';
+  html+='tr:last-child td{border-bottom:none}';
+  html+='.td-r{text-align:right}.td-c{text-align:center}';
+  html+='.chip{font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}';
+  html+='.chip-en{background:#E8F5EE;color:#1A7A4A}';
+  html+='.chip-pr{background:#FEF0E0;color:#B86010}';
+  html+='.chip-ag{background:#F0F1F5;color:#6B7080}';
+  html+='.footer{margin-top:28px;padding-top:14px;border-top:1px solid #E8E9EF;display:flex;justify-content:space-between;font-size:10px;color:#9DA3B4}';
+  html+='@media print{body{background:#fff;font-size:10.5px}.page{padding:10px}.no-print{display:none}@page{margin:10mm;size:A4}th{padding:4px 8px!important;font-size:9px!important}td{padding:4px 8px!important;font-size:10px!important}h1{font-size:14px}}';
+  html+='</style></head><body>';
+  html+='<div class="no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">';
+  html+='<button onclick="window.print()" style="background:#1C1E2E;color:#fff;border:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">🖨 Imprimir</button>';
+  html+='<button onclick="window.close()" style="background:#F0F1F5;color:#1C1E2E;border:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">✕ Fechar</button>';
+  html+='</div>';
+  html+='<div class="page">';
+
+  html+='<div class="header">';
+  html+='<div class="h-info">';
+  html+='<h1>Relatório de Material de Limpeza</h1>';
+  html+='<p>Grupo AR — Centro de Distribuição</p>';
+  html+='<p style="margin-top:3px;font-size:11px;color:#6B7080">'+(semsAtivas||'Todas as semanas')+'</p>';
+  html+='<span class="badge-prov">PROVISÓRIO</span>';
+  html+='</div>';
+  html+='<div style="text-align:right">';
+  html+='<img class="logo" src="'+logo_data+'">';
+  html+='<div style="font-size:11px;color:#9DA3B4;margin-top:6px">Gerado em<br>'+agora.toLocaleDateString('pt-BR')+' às '+agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</div>';
+  html+='</div></div>';
+
+  html+='<div class="rest-section">';
+  html+='<div class="rest-header" style="background:'+cor+'">';
+  html+='<span style="font-size:15px;font-weight:700">MATERIAL DE LIMPEZA</span>';
+  html+='<span style="font-size:18px;font-weight:700">'+fmtNum(total)+'</span>';
+  html+='</div>';
+  html+='<div class="rest-stats">';
+  html+='<div class="rst"><div class="rst-l">Entregue</div><div class="rst-v green">'+fmtNum(entregue)+'</div></div>';
+  html+='<div class="rst"><div class="rst-l">Previsto/trânsito</div><div class="rst-v orange">'+fmtNum(previsto)+'</div></div>';
+  html+='<div class="rst"><div class="rst-l">Aguardando</div><div class="rst-v gray">'+fmtNum(aguardando)+'</div></div>';
+  html+='<div class="rst"><div class="rst-l">Entregues / Total</div><div class="rst-v">'+itens.filter(i=>i.status==='Entregue').length+' / '+itens.length+'</div></div>';
+  html+='</div>';
+  html+='<div class="prog-wrap">';
+  html+='<div class="prog"><div class="prog-fill" style="width:'+pct+'%;background:'+cor+'"></div></div>';
+  html+='<div class="prog-lbl">'+pct+'% entregue</div>';
+  html+='</div>';
+
+  html+='<table>';
+  html+='<thead><tr>';
+  html+='<th>Categoria</th><th>Item</th><th class="td-c">Med.</th>';
+  html+='<th class="td-r">Qtd.</th><th class="td-r">Valor unit.</th>';
+  html+='<th class="td-r">Total</th><th class="td-c">Previsão</th><th class="td-c">Status</th>';
+  html+='</tr></thead><tbody>';
+
+  const fornecedores=[...new Set(itens.map(i=>i.fornecedor||'—'))].sort();
+  fornecedores.forEach(forn=>{
+    const its=itens.filter(i=>(i.fornecedor||'—')===forn);
+    html+='<tr style="background:#F5F6FA">';
+    html+='<td colspan="8" style="font-size:11px;font-weight:700;color:#1C1E2E;text-transform:uppercase;letter-spacing:0.05em;padding:7px 10px;border-bottom:1px solid #E8E9EF">'+forn+'</td>';
+    html+='</tr>';
+    its.forEach(it=>{
+      const sub=(parseFloat(it.valor_unit)||0)*(parseFloat(it.quantidade)||0);
+      const chipCls=it.status==='Entregue'?'chip-en':it.status==='Previsto'?'chip-pr':'chip-ag';
+      const status=it.status||'Aguardando';
+      html+='<tr>';
+      html+='<td style="color:#6B7080;font-size:11px">'+(it.categoria||'—')+'</td>';
+      html+='<td style="font-weight:500">'+it.produto+'</td>';
+      html+='<td class="td-c" style="color:#6B7080">'+(it.unidade||'UN')+'</td>';
+      html+='<td class="td-r">'+(it.quantidade||'—')+'</td>';
+      html+='<td class="td-r">'+(it.valor_unit>0?fmtNum(parseFloat(it.valor_unit)):'—')+'</td>';
+      html+='<td class="td-r" style="font-weight:600">'+(sub>0?fmtNum(sub):'—')+'</td>';
+      html+='<td class="td-c">'+(it.previsao_entrega?fmtD(it.previsao_entrega):'—')+'</td>';
+      html+='<td class="td-c"><span class="chip '+chipCls+'">'+status+'</span></td>';
+      html+='</tr>';
+    });
+  });
+
+  html+='<tr style="background:#F5F6FA;font-weight:700">';
+  html+='<td colspan="5" style="text-align:right;font-size:11px;color:#6B7080;text-transform:uppercase;letter-spacing:0.05em">Total geral</td>';
+  html+='<td class="td-r" style="font-size:14px;color:'+cor+'">'+fmtNum(total)+'</td>';
+  html+='<td colspan="2"></td></tr>';
+  html+='</tbody></table></div>';
+
+  html+='<div class="footer">';
+  html+='<span>Grupo AR — Centro de Distribuição — Plataforma de Compras</span>';
+  html+='<span>Documento provisório — '+agora.toLocaleDateString('pt-BR')+' '+agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span>';
+  html+='</div>';
+  html+='</div></body></html>';
+
+  abrirEspelhoModal(html,'Relatório de Material de Limpeza ('+dataArquivo()+')');
+}
+
+
 function openNovaLimSemana(){
   showModal(
     '<div style="font-size:16px;font-weight:700;color:var(--c-text);margin-bottom:14px;display:flex;align-items:center;gap:8px">'
@@ -2815,7 +2978,10 @@ function renderLimpezaMeses(el){
   // Cabeçalho com botão nova semana
   let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   html+='<div style="font-size:13px;color:var(--c-dim)">Selecione o mês para ver os pedidos</div>';
+  html+='<div style="display:flex;gap:8px">';
+  html+='<button class="btn btn-sm" id="btn-lim-relatorio"><i class="ti ti-file-analytics"></i> Gerar relatório</button>';
   html+='<button class="btn btn-sm btn-acc" id="btn-lim-nova-semana"><i class="ti ti-calendar-plus"></i> Nova semana</button>';
+  html+='</div>';
   html+='</div>';
 
   if(!keys.length){
@@ -2824,6 +2990,8 @@ function renderLimpezaMeses(el){
     setTimeout(()=>{
       const btn=document.getElementById('btn-lim-nova-semana');
       if(btn)btn.addEventListener('click',()=>openNovaLimSemana());
+      const btnRel=document.getElementById('btn-lim-relatorio');
+      if(btnRel)btnRel.addEventListener('click',()=>gerarRelatorioLimpezaPrint());
     },50);
     return;
   }
@@ -2844,6 +3012,9 @@ function renderLimpezaMeses(el){
     // Botão nova semana
     const btn=document.getElementById('btn-lim-nova-semana');
     if(btn)btn.addEventListener('click',()=>openNovaLimSemana());
+    // Botão gerar relatório
+    const btnRel=document.getElementById('btn-lim-relatorio');
+    if(btnRel)btnRel.addEventListener('click',()=>gerarRelatorioLimpezaPrint());
     // Cards de mês
     document.querySelectorAll('.lim-mes-card').forEach(card=>{
       card.addEventListener('click',()=>{
