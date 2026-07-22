@@ -3116,7 +3116,10 @@ async function criarPedidoLimpeza(semId){
       produto_nome:it.produto,categoria:it.categoria,fornecedor:it.fornecedor,
       valor_unit:it.valor_unit,unidade:it.unidade,restaurante_nome:'Limpeza'
     }));
-    if(histRows.length)await supa.from('historico_precos').insert(histRows);
+    if(histRows.length){
+      const {error:histErr}=await supa.from('historico_precos').insert(histRows);
+      if(histErr)toast('Pedido criado, mas houve erro ao salvar histórico de preços: '+histErr.message);
+    }
   }
 
   limSel={};
@@ -3157,10 +3160,11 @@ async function updLimItemValor(itemId,pedId,val){
   if(v>0){
     const it=C.itens_limpeza.find(i=>i.id===itemId);
     if(it){
-      await supa.from('historico_precos').insert({
+      const {error:histErr}=await supa.from('historico_precos').insert({
         produto_nome:it.produto,categoria:it.categoria,fornecedor:it.fornecedor||'—',
         valor_unit:v,unidade:it.unidade,restaurante_nome:'Limpeza'
       });
+      if(histErr)toast('Preço salvo, mas houve erro ao registrar histórico: '+histErr.message);
     }
   }
   const mesKey=document.getElementById('area-limpeza').dataset.meskey||'';
